@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Weekly K-Line Dashboard</title>
+    <!-- SheetJS for Excel parsing -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #1a1a1a;
+            --card-bg: #2d2d2d;
+            --text-color: #e0e0e0;
+            --accent-color: #4a90e2;
+            --border-color: #404040;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+        }
+
+        header {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-bottom: 30px;
+            padding: 20px;
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: center;
+        }
+
+        input[type="text"] {
+            padding: 10px 15px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            background-color: #1e1e1e;
+            color: white;
+            font-size: 14px;
+            width: 200px;
+        }
+
+        button {
+            padding: 10px 20px;
+            border-radius: 6px;
+            border: none;
+            background-color: var(--accent-color);
+            color: white;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: #357abd;
+        }
+
+        button.secondary {
+            background-color: var(--border-color);
+        }
+
+        button.secondary:hover {
+            background-color: #505050;
+        }
+
+        #file-drop-zone {
+            border: 2px dashed var(--border-color);
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.2s;
+            flex-grow: 1;
+            max-width: 400px;
+        }
+
+        #file-drop-zone:hover,
+        #file-drop-zone.dragover {
+            border-color: var(--accent-color);
+            background-color: rgba(74, 144, 226, 0.1);
+        }
+
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+            gap: 20px;
+        }
+
+        .chart-card {
+            background-color: var(--card-bg);
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            position: relative;
+            transition: transform 0.2s;
+        }
+
+        .chart-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .card-header {
+            padding: 10px 15px;
+            background-color: rgba(0, 0, 0, 0.2);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .remove-btn {
+            color: #ff6b6b;
+            cursor: pointer;
+            font-size: 18px;
+            line-height: 1;
+        }
+
+        .chart-img {
+            max-width: 100%;
+            width: auto;
+            height: auto;
+            display: block;
+            margin: 0 auto;
+            background-color: #222;
+        }
+
+        .star-btn {
+            cursor: pointer;
+            font-size: 18px;
+            color: #888;
+            margin-right: 5px;
+            transition: color 0.2s;
+        }
+
+        .star-btn:hover {
+            color: #ffd700;
+        }
+
+        .star-btn.active {
+            color: #ffd700;
+        }
+
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #888;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 600px) {
+            .grid-container {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <h1>Multiple Weekly K-Line Charts (Eastmoney)</h1>
+        <div class="controls">
+            <input type="text" id="add-stock-input" placeholder="Enter Code (e.g. 002475)">
+            <button onclick="addStockFromInput()">Add Stock</button>
+            <button class="secondary" onclick="refreshAllfunc()">Refresh All</button>
+
+            <div style="display: flex; align-items: center; gap: 5px; margin-left: 10px; margin-right: 10px;">
+                <label for="col-setting" style="font-size: 14px; white-space: nowrap;">Cols:</label>
+                <input type="number" id="col-setting" min="1" max="10" placeholder="Auto"
+                    style="width: 60px; padding: 5px;" onchange="updateColumns()">
+            </div>
+
+            <button class="secondary" onclick="clearView()" title="Remove all charts from screen">Clear View</button>
+            <button class="secondary" onclick="exportFavorites()" title="Download your favorites as Excel">Export
+                Favorites</button>
+            <button class="secondary" onclick="clearFavorites()" style="color: #ff6b6b;"
+                title="Delete all saved favorites">Clear Favorites</button>
+
+            <div id="file-drop-zone" onclick="document.getElementById('file-input').click()">
+                <span id="file-label">Click or Drag Excel File Here</span>
+                <input type="file" id="file-input" accept=".xlsx, .xls" style="display: none"
+                    onchange="handleFileSelect(event)">
+            </div>
+            <span id="stock-count" style="margin-left: auto; font-size: 0.9em; color: #aaa;">0 stocks loaded</span>
+        </div>
+    </header>
+
+    <div id="grid" class="grid-container">
+        <!-- Charts will be injected here -->
+    </div>
+
+    <script>
+        // Initial default stocks
+        let stockCodes = [
+            "002475", // Luxshare
+            "600519", // Moutai
+            "300750", // CATL
+            "000858", // Wuliangye
+            "601318", // Ping An
+            "000333", // Midea
+        ];
+
+        function getStockInfo(code) {
+            // Returns { market: '0'/'1', prefix: 'sz'/'sh'/'bj' }
+            // 6xxxxx -> sh (1)
+            // 0xxxxx -> sz (0)
+            // 3xxxxx -> sz (0)
+            // 8xxxxx, 4xxxxx, 920xxx -> bj (0) - usually Beijing/NEEQ uses 0 nid on Eastmoney
+
+            let prefix = 'sz';
+            let market = '0';
+
+            if (/^6/.test(code)) {
+                prefix = 'sh';
+                market = '1';
+            } else if (/^900/.test(code)) { // B share SH
+                prefix = 'sh';
+                market = '1';
+            } else if (/^(4|8|920)/.test(code)) {
+                prefix = 'bj';
+                market = '0'; // Eastmoney uses 0 for BJ/NEEQ image API
+            } else {
+                // 0xxxxx, 3xxxxx, 200xxx (B share SZ)
+                prefix = 'sz';
+                market = '0';
+            }
+
+            return { prefix, market };
+        }
+
+        // Favorites Logic
+        let favorites = new Set(JSON.parse(localStorage.getItem('stock_favorites') || '[]'));
+
+        // Load Column Setting
+        const savedCols = localStorage.getItem('stock_columns');
+        if (savedCols) {
+            document.getElementById('col-setting').value = savedCols;
+            // Apply immediately
+            setTimeout(() => updateColumns(), 0);
+        }
+
+        // Initial load: Use favorites if available, otherwise default
+        if (favorites.size > 0) {
+            stockCodes = Array.from(favorites);
+        }
+
+        function updateColumns() {
+            const val = document.getElementById('col-setting').value;
+            const grid = document.getElementById('grid');
+
+            if (val && val > 0) {
+                grid.style.gridTemplateColumns = `repeat(${val}, 1fr)`;
+                localStorage.setItem('stock_columns', val);
+            } else {
+                grid.style.gridTemplateColumns = ''; // Revert to CSS default (auto-fill)
+                localStorage.removeItem('stock_columns');
+            }
+        }
+
+        function toggleFavorite(code, event) {
+            // Prevent event from bubbling if needed, though specific clicking is fine
+            // We need to identify the specific star element. 
+            // Since we might have duplicates (if user added same code twice?), robust way is to find all instances
+            // But simpler is to just update the clicked one and any others matching it.
+
+            if (favorites.has(code)) {
+                favorites.delete(code);
+            } else {
+                favorites.add(code);
+            }
+            localStorage.setItem('stock_favorites', JSON.stringify(Array.from(favorites)));
+
+            // Update UI without re-rendering grid
+            // Find all star buttons for this code
+            const headers = document.querySelectorAll('.card-header');
+            headers.forEach(header => {
+                if (header.textContent.includes(code)) {
+                    const star = header.querySelector('.star-btn');
+                    if (star) {
+                        if (favorites.has(code)) {
+                            star.classList.add('active');
+                            star.textContent = '★';
+                        } else {
+                            star.classList.remove('active');
+                            star.textContent = '☆';
+                        }
+                    }
+                }
+            });
+        }
+
+        function isFavorite(code) {
+            return favorites.has(code);
+        }
+
+        function getEastmoneyUrl(code) {
+            const { market } = getStockInfo(code);
+            const nid = `${market}.${code}`;
+            const timestamp = new Date().getTime(); // Anti-cache
+            return `https://webquoteklinepic.eastmoney.com/GetPic.aspx?nid=${nid}&type=W&unitWidth=-6&ef=&formula=RSI&AT=1&imageType=KXL&timespan=${timestamp}`;
+        }
+
+        // Updated renderGrid to include Star
+        function renderGrid() {
+            const grid = document.getElementById('grid');
+            grid.innerHTML = '';
+
+            const countSpan = document.getElementById('stock-count');
+            countSpan.textContent = `${stockCodes.length} stocks loaded`;
+
+            stockCodes.forEach((code, index) => {
+                const card = document.createElement('div');
+                card.className = 'chart-card';
+
+                const { prefix } = getStockInfo(code);
+                const imageUrl = getEastmoneyUrl(code);
+
+                // Link URL logic:
+                // sh -> https://quote.eastmoney.com/sh600519.html
+                // sz -> https://quote.eastmoney.com/sz002475.html
+                // bj -> https://quote.eastmoney.com/bj/920641.html (Slash after bj)
+
+                let linkUrl;
+                if (prefix === 'bj') {
+                    linkUrl = `https://quote.eastmoney.com/bj/${code}.html`;
+                } else {
+                    linkUrl = `https://quote.eastmoney.com/${prefix}${code}.html`;
+                }
+
+                const starClass = isFavorite(code) ? 'star-btn active' : 'star-btn';
+                const starIcon = isFavorite(code) ? '★' : '☆';
+
+                card.innerHTML = `
+                <div class="card-header">
+                    <div>
+                        <span class="${starClass}" onclick="toggleFavorite('${code}')" title="Toggle Favorite">${starIcon}</span>
+                        <a href="${linkUrl}" target="_blank" style="color: inherit; text-decoration: none; margin-left: 5px;">
+                            <span style="color: var(--accent-color); font-weight: bold;">${prefix.toUpperCase()}</span>${code}
+                        </a>
+                    </div>
+                    <span class="remove-btn" onclick="removeStock(${index})">&times;</span>
+                </div>
+                <div style="position: relative; min-height: 50px;">
+                    <a href="${linkUrl}" target="_blank" style="display: block; cursor: pointer;">
+                        <div class="loading">Loading...</div>
+                        <img src="${imageUrl}" class="chart-img" onload="this.previousElementSibling.style.display='none'" onerror="this.previousElementSibling.innerText='Error'">
+                    </a>
+                </div>
+            `;
+                grid.appendChild(card);
+            });
+        }
+
+        function addStockFromInput() {
+            const input = document.getElementById('add-stock-input');
+            let code = input.value.trim();
+
+            // Handle input with prefix "sz002475" -> strip to "002475"
+            const match = code.match(/^(?:sz|sh|bj)?(\d{6})$/i);
+
+            if (match) {
+                code = match[1];
+                if (!stockCodes.includes(code)) {
+                    stockCodes.unshift(code);
+                    // Optional: Auto-favorite manually added stocks?
+                    // Let's decide NO, user should explicitly star it.
+                    renderGrid();
+                }
+                input.value = '';
+            } else {
+                alert("Please enter a valid 6-digit stock code.");
+            }
+        }
+
+        function removeStock(index) {
+            // Removing from view does NOT remove from favorites automatically
+            // This allows user to temporarily clear list but keep db safe
+            stockCodes.splice(index, 1);
+            renderGrid();
+        }
+
+        function refreshAllfunc() {
+            renderGrid();
+        }
+
+        function exportFavorites() {
+            if (favorites.size === 0) {
+                alert("No favorites to export!");
+                return;
+            }
+
+            // Only keep "股票代码" column as requested
+            const data = [["股票代码"]];
+
+            favorites.forEach(code => {
+                const { prefix } = getStockInfo(code);
+                // Format: 000001.SZ/SH/BJ (Matching the suffix style of the example file)
+                const formattedCode = `${code}.${prefix.toUpperCase()}`;
+
+                data.push([formattedCode]);
+            });
+
+            // Create workbook
+            const ws = XLSX.utils.aoa_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
+
+            // Download
+            XLSX.writeFile(wb, "my_stock_favorites.xlsx");
+        }
+
+        function clearView() {
+            stockCodes = [];
+            renderGrid();
+        }
+
+        function clearFavorites() {
+            if (favorites.size === 0) {
+                alert("No favorites to clear.");
+                return;
+            }
+            if (confirm("Are you sure you want to delete ALL favorites?\nThis cannot be undone.")) {
+                favorites.clear();
+                localStorage.removeItem('stock_favorites');
+                renderGrid(); // Re-render to update stars (they will all turn off)
+                // Optional: Should we also clear the view? 
+                // Let's keep the view but remove the 'favorite' status.
+            }
+        }
+
+        // --- File Handling (Drag & Drop + SheetJS) ---
+
+        // Drag events
+        const dropZone = document.getElementById('file-drop-zone');
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length) {
+                processFile(files[0]);
+            }
+        });
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                processFile(file);
+            }
+        }
+
+        function processFile(file) {
+            const reader = new FileReader();
+            document.getElementById('file-label').textContent = `Reading ${file.name}...`;
+
+            reader.onload = function (e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert to JSON with array of arrays (header included)
+                const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+                if (!rows || rows.length === 0) {
+                    alert("Empty file");
+                    return;
+                }
+
+                // 1. Find the "Stock Code" column index
+                // Look for headers like "股票代码", "Code", "代码", "stock_code"
+                let codeColIndex = -1;
+                const headers = rows[0]; // Assume first row is header
+
+                if (Array.isArray(headers)) {
+                    headers.forEach((cell, index) => {
+                        const text = String(cell).trim();
+                        if (text.includes("代码") || text.toLowerCase().includes("code")) {
+                            codeColIndex = index;
+                        }
+                    });
+                }
+
+                // Fallback: if header not found, check the first few rows for a column that looks like stock codes
+                if (codeColIndex === -1 && rows.length > 1) {
+                    // Check first 5 rows (skipping header)
+                    const sampleLimit = Math.min(rows.length, 6);
+                    for (let col = 0; col < (rows[1] || []).length; col++) {
+                        let validCount = 0;
+                        for (let r = 1; r < sampleLimit; r++) {
+                            if (!rows[r]) continue;
+                            const cell = String(rows[r][col] || "");
+                            if (/(?:sz|sh)?\d{6}(?:\.sz|\.sh)?/i.test(cell)) {
+                                validCount++;
+                            }
+                        }
+                        if (validCount > 0) {
+                            codeColIndex = col;
+                            break; // Found a likely candidate
+                        }
+                    }
+                }
+
+                const newCodes = new Set();
+
+                // 2. Iterate and extract
+                // Start from row 1 if we found a header in row 0, otherwise row 0
+                const startRow = (codeColIndex !== -1 && String(headers[codeColIndex]).includes("代码")) ? 1 : 0;
+
+                for (let i = startRow; i < rows.length; i++) {
+                    const row = rows[i];
+                    if (!row) continue;
+
+                    // If we have a specific column, only look there. 
+                    // If we failed to find a column, standard fallback (scan all? or just fail?)
+                    // Let's fallback to scanning the row if codeColIndex is still -1 (simple list)
+
+                    const cellsToCheck = (codeColIndex !== -1) ? [row[codeColIndex]] : row;
+
+                    cellsToCheck.forEach(cell => {
+                        if (!cell) return;
+                        let str = String(cell).trim();
+
+                        // Match pattern: 
+                        // Optional prefix: sz, sh
+                        // Capture group 1: 6 digits
+                        // Optional suffix: .sz, .sh
+                        const match = str.match(/^(?:sz|sh)?(\d{6})(?:\.(sz|sh))?$/i);
+
+                        if (match) {
+                            const code = match[1];
+                            // We could capture suffix match[2] to identify market accurately
+                            // But for now, just adding the code is enough given our getEastmoneyUrl logic
+                            // (which guesses based on 6/0/3).
+                            // If we want to be 100% precise, we should store objects {code, market}.
+                            // But let's stick to the list of strings for compatibility with the existing renderGrid.
+                            newCodes.add(code);
+                        } else if (codeColIndex === -1) {
+                            // Loose match only if we are scanning vaguely
+                            const looseMatch = str.match(/(?:sz|sh)?(\d{6})/i);
+                            if (looseMatch) newCodes.add(looseMatch[1]);
+                        }
+                    });
+                }
+
+                if (newCodes.size > 0) {
+                    const newCodesArray = Array.from(newCodes);
+                    // Filter out likely dates (e.g. 2024xxxx) if we are scanning blindly? 
+                    // With the strict regex `^(?:sz|sh)?(\d{6})(?:\.(sz|sh))?$/i` on the specific column, dates shouldn't match unless they have .sz suffix.
+
+                    stockCodes = [...new Set([...newCodesArray, ...stockCodes])];
+                    renderGrid();
+                    document.getElementById('file-label').textContent = `Loaded ${newCodes.size} codes from column ${codeColIndex > -1 ? headers[codeColIndex] : 'unknown'}.`;
+                } else {
+                    document.getElementById('file-label').textContent = "No valid codes found.";
+                }
+            };
+
+            reader.readAsArrayBuffer(file);
+        }
+
+        // Initial Render
+        renderGrid();
+
+    </script>
+
+</body>
+
+</html>
