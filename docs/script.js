@@ -560,10 +560,14 @@ function renderGrid() {
         card.className = 'chart-card';
 
         const { prefix } = getStockInfo(code);
-        // Link logic kept for title click
-        const linkUrl = prefix === 'bj'
-            ? `https://quote.eastmoney.com/bj/${code}.html`
-            : `https://quote.eastmoney.com/${prefix}${code}.html`;
+        // Determine Link URL (H5 Chart with params)
+        // Market: 1=SH, 2=SZ (and likely BJ)
+        const marketParam = prefix === 'sh' ? '1' : '2';
+        // Period: D->k, W->wk, M->mk
+        const periodMap = { 'D': 'k', 'W': 'wk', 'M': 'mk' };
+        const typeParam = periodMap[State.klinePeriod] || 'wk';
+
+        const linkUrl = `https://quote.eastmoney.com/basic/h5chart-iframe.html?code=${code}&market=${marketParam}&type=${typeParam}`;
 
         const isFav = State.favorites.has(code);
         const starClass = isFav ? 'star-btn active' : 'star-btn';
