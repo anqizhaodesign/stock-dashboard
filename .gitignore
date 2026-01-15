@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+
+# Data Files (Keep local only)
+*.xlsx
+*.xls
+*.csv
+
+# Logs & System
+npm-debug.log*
+Thumbs.db
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
