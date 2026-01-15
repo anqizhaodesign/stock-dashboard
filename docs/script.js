@@ -552,12 +552,14 @@ function renderGrid() {
 
         const { prefix } = getStockInfo(code);
 
+        // Map prefix to Market ID for h5chart-iframe
+        // sh -> 1, sz -> 2, bj -> 0
+        let marketId = '2'; // Default to SZ (2)
+        if (prefix === 'sh') marketId = '1';
+        if (prefix === 'bj') marketId = '0';
 
-        let suffix = '.SZ';
-        if (prefix === 'sh') suffix = '.SH';
-        if (prefix === 'bj') suffix = '.BJ';
-
-        const iframeUrl = `https://quote.eastmoney.com/newstatic/html/profitchart_new.html?code=${code}${suffix}`;
+        // type=k gives Day/Week/Month tabs (Standard K-Line)
+        const iframeUrl = `https://quote.eastmoney.com/basic/h5chart-iframe.html?code=${code}&market=${marketId}&type=k`;
 
         // Link to Eastmoney Quote
         const linkUrl = prefix === 'bj'
