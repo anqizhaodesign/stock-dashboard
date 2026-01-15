@@ -1266,8 +1266,15 @@ function renderChart(container, data, newsList = []) {
             splitLine: { show: false },
             min: 'dataMin',
             max: 'dataMax',
-            axisLabel: { show: false },
-            axisTick: { show: false }
+            axisLabel: {
+                show: true,
+                formatter: function (value) {
+                    // Try to show simpler date: MM-DD or YY-MM-DD
+                    // Value is typically "2025-01-01"
+                    return echarts.format.formatTime('MM-dd', value);
+                }
+            },
+            axisTick: { show: true }
         },
         yAxis: [
             {
