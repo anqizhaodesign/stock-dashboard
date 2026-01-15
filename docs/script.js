@@ -560,8 +560,7 @@ function renderGrid() {
         card.className = 'chart-card';
 
         const { prefix } = getStockInfo(code);
-        const imageUrl = getEastmoneyUrl(code);
-        // Link to Eastmoney Quote
+        // Link logic kept for title click
         const linkUrl = prefix === 'bj'
             ? `https://quote.eastmoney.com/bj/${code}.html`
             : `https://quote.eastmoney.com/${prefix}${code}.html`;
@@ -570,7 +569,6 @@ function renderGrid() {
         const starClass = isFav ? 'star-btn active' : 'star-btn';
         const starIcon = isFav ? '★' : '☆';
 
-        // Join agencies for display
         const agencyText = agencies.length > 0 ? agencies.join(', ') : '';
 
         card.innerHTML = `
@@ -590,15 +588,8 @@ function renderGrid() {
                     ¥${price}
                 </div>
             </div>
-            <div class="card-body">
-                <div style="position: relative; width: 100%; height:100%; display:flex; justify-content:center;">
-                     <a href="${linkUrl}" target="_blank" style="display: block; cursor: pointer; width:100%;">
-                        <div class="loading">Loading...</div>
-                        <img src="${imageUrl}" class="chart-img" loading="lazy" 
-                            onload="this.previousElementSibling.style.display='none'" 
-                            onerror="this.previousElementSibling.innerText='Ind. unavailable'">
-                    </a>
-                </div>
+            <div class="card-body" style="height: 300px; padding: 0;">
+                 <div class="chart-container" style="width:100%; height:100%;"></div>
             </div>
             <div class="card-footer">
                 <div class="agency-list" title="${agencyText || 'No Agency Data'}">
@@ -608,6 +599,19 @@ function renderGrid() {
             </div>
         `;
         grid.appendChild(card);
+
+        // Trigger ECharts Render
+        const chartDiv = card.querySelector('.chart-container');
+
+        fetchKlineData(code).then(data => {
+            if (!data || data.error) {
+                chartDiv.innerHTML = `<div style="display:flex;justify-content:center;align-items:center;height:100%;color:#999;font-size:12px;">${data?.error || 'No Data'}</div>`;
+                return;
+            }
+            renderChart(chartDiv, data);
+        }).catch(err => {
+            chartDiv.innerHTML = '<div style="display:flex;justify-content:center;align-items:center;height:100%;color:red;font-size:12px;">Load Error</div>';
+        });
     });
 }
 
@@ -1064,8 +1068,12 @@ async function fetchKlineData(code) {
     if (prefix === 'sh') secidPrefix = '1';
 
     // API: https://push2his.eastmoney.com/api/qt/stock/kline/get
-    // klt=102 (Week), lmt=120 (approx 2 years)
-    const url = `https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=${secidPrefix}.${code}&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f57&klt=102&fqt=1&beg=0&end=20500000&lmt=120`;
+    // klt: 101=Day, 102=Week, 103=Month
+    let klt = 101;
+    if (State.klinePeriod === 'W') klt = 102;
+    if (State.klinePeriod === 'M') klt = 103;
+
+    const url = `https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=${secidPrefix}.${code}&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f57&klt=${klt}&fqt=1&beg=0&end=20500000&lmt=120`;
 
     try {
         const response = await fetch(url);
@@ -1078,6 +1086,11 @@ async function fetchKlineData(code) {
         const dates = [];
         const values = []; // [Open, Close, Low, High]
         const volumes = [];
+
+        if (klines.length === 0) {
+            console.warn("No klines data for", code);
+            return null;
+        }
 
         klines.forEach(item => {
             const parts = item.split(',');
@@ -1096,7 +1109,7 @@ async function fetchKlineData(code) {
         return { dates, values, volumes };
     } catch (e) {
         console.error("Failed to fetch kline data", e);
-        return null;
+        return { error: e.message };
     }
 }
 
