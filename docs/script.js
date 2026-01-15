@@ -1175,56 +1175,29 @@ function renderChart(container, data, newsList = []) {
 
     const myChart = echarts.init(container);
 
-    // Process News for MarkPoints
-    const markPointData = [];
+    // Process News for Scatter Series (Fixed at top)
+    const newsScatterData = [];
     if (newsList && newsList.length > 0) {
-        // Map news to dates. Since we might have multiple news per day, we need logic.
-        // For simplicity, we just mark the day.
-
-        // We need to match news dates to chart dates (data.dates)
-        // Chart dates are typically "2024-01-01".
-
-        // Group by date
         const newsByDate = {};
         newsList.forEach(item => {
-            // item.Time is "yyyy-MM-dd hh:mm:ss" or "yyyy-MM-dd"
             let dateStr = item.Time;
             if (dateStr.length > 10) dateStr = dateStr.substring(0, 10);
-
             if (!newsByDate[dateStr]) newsByDate[dateStr] = [];
             newsByDate[dateStr].push(item);
         });
 
-        // Create markers
-        // We only mark if the date exists in the chart data (to avoid placement errors)
-        // Or ECharts handles non-existent categories gracefully? Usually it needs exact match for category axis.
-
-        // Let's iterate chart dates to find matches (or vice versa)
-        data.dates.forEach((d, idx) => {
+        data.dates.forEach((d) => {
             if (newsByDate[d]) {
                 const items = newsByDate[d];
                 const distinctTypes = new Set(items.map(i => i.Type));
-                let symbolColor = '#333'; // Default black
-                if (distinctTypes.has(2)) symbolColor = '#ef232a'; // Red for notices? Or just keep black as requested.
-                // User asked for "black little markers".
-
-                markPointData.push({
-                    name: 'News',
-                    coord: [d, data.values[idx][3]], // [Date, High] - place on top of high
-                    value: items.length, // Show count? or just a symbol
-                    symbol: 'arrow',
-                    symbolSize: 8,
+                // Use Scatter data format: [X, Y, Extras]
+                // Y is fixed at '1' (top of secondary axis)
+                newsScatterData.push({
+                    value: [d, 1],
+                    newsItems: items,
+                    symbol: 'arrow', // Standard arrow
                     symbolRotate: 180, // Point down
-                    symbolOffset: [0, -10], // Slightly above
-                    itemStyle: { color: '#333' },
-                    tooltip: {
-                        formatter: () => {
-                            // Custom tooltip list
-                            return items.map(i => `• ${i.Title}`).join('<br/>');
-                        }
-                    },
-                    // Custom data to hold Titles for click/hover
-                    newsItems: items
+                    itemStyle: { color: distinctTypes.has(2) ? '#333' : '#333' }
                 });
             }
         });
@@ -1240,19 +1213,48 @@ function renderChart(container, data, newsList = []) {
         grid: {
             left: '5%',
             right: '2%',
-            top: '5%',
-            bottom: '15%', // Simple layout
+            top: '12%', // Give more space at top for markers
+            bottom: '15%',
             containLabel: true
         },
         tooltip: {
             trigger: 'axis',
-            axisPointer: {
-                type: 'cross'
-            },
+            enterable: true, // Allow clicking links
+            confine: true, // Keep inside widget
+            axisPointer: { type: 'cross' },
             position: function (pos, params, el, elRect, size) {
                 const obj = { top: 10 };
                 obj[['left', 'right'][+(pos[0] < size.viewSize[0] / 2)]] = 30;
                 return obj;
+            },
+            // Custom formatter to handle both Candle and News
+            formatter: function (params) {
+                let result = '';
+                let date = '';
+
+                // Params is array of series data
+                params.forEach(p => {
+                    if (!date) date = p.name || p.axisValue;
+
+                    if (p.seriesName === 'K-Line') {
+                        // Basic OHLC info
+                        const val = p.value; // [open, close, low, high] (index 0 is date usually excluded in tooltip value array logic by echarts?)
+                        // ECharts candle value: [index, open, close, low, high]
+                        // Actually render logic handles it.
+                        // Let's use default tooltip for numbers or custom:
+                        result += `${p.marker || ''} <b>${p.seriesName}</b><br/>
+                                   Open: ${val[1]}<br/>
+                                   Close: ${val[2]}<br/>
+                                   Low: ${val[3]}<br/>
+                                   High: ${val[4]}<br/>`;
+                    } else if (p.seriesName === 'News' && p.data.newsItems) {
+                        result += `<hr style="margin:5px 0;border:0;border-top:1px solid #ddd;"/>`;
+                        p.data.newsItems.forEach(item => {
+                            result += `• <a href="${item.Url}" target="_blank" style="color:#007bff;text-decoration:none;">${item.Title}</a><br/>`;
+                        });
+                    }
+                });
+                return `<div><b>${date}</b><br/>${result}</div>`;
             }
         },
         // Show only last ~40 candles by default to make granularity obvious
@@ -1267,23 +1269,28 @@ function renderChart(container, data, newsList = []) {
         xAxis: {
             type: 'category',
             data: data.dates,
-            boundaryGap: true,
+            boundaryGap: false,
             axisLine: { onZero: false },
             splitLine: { show: false },
-            axisLabel: { show: false }, // Hide dates to save space in small card
+            min: 'dataMin',
+            max: 'dataMax',
+            axisLabel: { show: false },
             axisTick: { show: false }
         },
-        yAxis: {
-            scale: true,
-            splitNumber: 3, // Fewer grid lines
-            splitArea: {
-                show: true
+        yAxis: [
+            {
+                scale: true,
+                splitArea: { show: true }
             },
-            axisLabel: {
-                fontSize: 10,
-                color: '#999'
+            {
+                type: 'value',
+                scale: true,
+                min: 0,
+                max: 1,
+                show: false, // Invisible dummy axis
+                position: 'right'
             }
-        },
+        ],
         series: [
             {
                 name: 'K-Line',
@@ -1295,29 +1302,15 @@ function renderChart(container, data, newsList = []) {
                     borderColor: upBorderColor,
                     borderColor0: downBorderColor
                 },
-                markPoint: {
-                    symbol: 'pin', // 'arrow' set above individually
-                    data: markPointData,
-                    label: { show: false }, // Don't show the count number
-                    tooltip: {
-                        show: true,
-                        backgroundColor: '#rgba(255,255,255,0.9)',
-                        borderColor: '#ccc',
-                        borderWidth: 1,
-                        textStyle: { color: '#333', fontSize: 10 },
-                        formatter: function (params) {
-                            if (params.data && params.data.newsItems) {
-                                const lines = params.data.newsItems.slice(0, 5).map(i => {
-                                    const t = i.Title.length > 20 ? i.Title.substring(0, 20) + '...' : i.Title;
-                                    return `• ${t}`;
-                                });
-                                if (params.data.newsItems.length > 5) lines.push(`... (+${params.data.newsItems.length - 5})`);
-                                return lines.join('<br>');
-                            }
-                            return params.name;
-                        }
-                    }
-                }
+                // Removed markPoint, moved to Scatter
+            },
+            {
+                name: 'News',
+                type: 'scatter',
+                yAxisIndex: 1, // Use fixed 0-1 axis
+                symbolSize: 10,
+                data: newsScatterData,
+                z: 10 // On top
             },
             // MA Lines (Optional, skipping for minimal load first)
         ]
