@@ -594,7 +594,8 @@ function renderGrid() {
             <div class="card-body" style="height: 300px; padding: 0; overflow:hidden;">
                 <!-- -126px margin-top to hide standard header and tab bar -->
                 <iframe src="${iframeUrl}" 
-                    style="width: 100%; height: 500px; border: none; margin-top: -126px;" 
+                    style="width: 100%; height: 500px; border: none; margin-top: -126px; overflow:hidden;" 
+                    scrolling="no"
                     loading="lazy"
                     title="${name} Chart">
                 </iframe>
