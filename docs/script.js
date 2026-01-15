@@ -1219,41 +1219,33 @@ function renderChart(container, data, newsList = []) {
         },
         tooltip: {
             trigger: 'axis',
-            enterable: true, // Allow clicking links
-            confine: true, // Keep inside widget
+            // enterable: true, // Only needed for news, but global axis tooltip usually doesn't need interactions
             axisPointer: { type: 'cross' },
             position: function (pos, params, el, elRect, size) {
                 const obj = { top: 10 };
                 obj[['left', 'right'][+(pos[0] < size.viewSize[0] / 2)]] = 30;
                 return obj;
             },
-            // Custom formatter to handle both Candle and News
+            // Global (Axis) Formatter: ONLY for K-Line and Volume
             formatter: function (params) {
                 let result = '';
                 let date = '';
 
-                // Params is array of series data
                 params.forEach(p => {
                     if (!date) date = p.name || p.axisValue;
 
                     if (p.seriesName === 'K-Line') {
-                        // Basic OHLC info
-                        const val = p.value; // [open, close, low, high] (index 0 is date usually excluded in tooltip value array logic by echarts?)
-                        // ECharts candle value: [index, open, close, low, high]
-                        // Actually render logic handles it.
-                        // Let's use default tooltip for numbers or custom:
-                        result += `${p.marker || ''} <b>${p.seriesName}</b><br/>
+                        const val = p.value; // [index, open, close, low, high]
+                        result += `${p.marker} <b>${p.seriesName}</b><br/>
                                    Open: ${val[1]}<br/>
                                    Close: ${val[2]}<br/>
                                    Low: ${val[3]}<br/>
                                    High: ${val[4]}<br/>`;
-                    } else if (p.seriesName === 'News' && p.data.newsItems) {
-                        result += `<hr style="margin:5px 0;border:0;border-top:1px solid #ddd;"/>`;
-                        p.data.newsItems.forEach(item => {
-                            result += `• <a href="${item.Url}" target="_blank" style="color:#007bff;text-decoration:none;">${item.Title}</a><br/>`;
-                        });
                     }
+                    // Ignore News here
                 });
+
+                if (!result) return ''; // Don't show if only news is hovered (though axis usually captures kline too)
                 return `<div><b>${date}</b><br/>${result}</div>`;
             }
         },
@@ -1310,7 +1302,25 @@ function renderChart(container, data, newsList = []) {
                 yAxisIndex: 1, // Use fixed 0-1 axis
                 symbolSize: 10,
                 data: newsScatterData,
-                z: 10 // On top
+                z: 10, // On top
+                // Series-specific Tooltip (Item Trigger)
+                tooltip: {
+                    show: true,
+                    trigger: 'item',
+                    enterable: true, // Clickable links
+                    position: 'top', // Show above the arrow
+                    formatter: function (p) {
+                        if (p.data && p.data.newsItems) {
+                            let content = `<div style="max-width:300px; white-space:normal;"><b>${p.name} News</b><hr style="margin:5px 0;border:0;border-top:1px solid #ddd;"/>`;
+                            p.data.newsItems.forEach(item => {
+                                content += `• <a href="${item.Url}" target="_blank" style="color:#007bff;text-decoration:none;">${item.Title}</a><br/>`;
+                            });
+                            content += '</div>';
+                            return content;
+                        }
+                        return '';
+                    }
+                }
             },
             // MA Lines (Optional, skipping for minimal load first)
         ]
