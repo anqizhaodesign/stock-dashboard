@@ -15,31 +15,122 @@ const State = {
     gridColumns: 'auto' // 'auto', 3, 4, 5, 6
 };
 
+// --- IndexedDB Helper ---
+const DB = {
+    name: 'StockDashboardDB',
+    version: 1,
+    db: null,
+
+    open: function () {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open(this.name, this.version);
+            request.onerror = (e) => reject(e.target.error);
+            request.onsuccess = (e) => {
+                this.db = e.target.result;
+                resolve(this.db);
+            };
+            request.onupgradeneeded = (e) => {
+                const db = e.target.result;
+                if (!db.objectStoreNames.contains('favorites')) {
+                    db.createObjectStore('favorites', { keyPath: 'code' });
+                }
+                if (!db.objectStoreNames.contains('uploads')) {
+                    db.createObjectStore('uploads', { keyPath: 'id' });
+                }
+            };
+        });
+    },
+
+    getAll: function (storeName) {
+        return new Promise((resolve, reject) => {
+            const tx = this.db.transaction(storeName, 'readonly');
+            const store = tx.objectStore(storeName);
+            const request = store.getAll();
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    },
+
+    put: function (storeName, data) {
+        return new Promise((resolve, reject) => {
+            const tx = this.db.transaction(storeName, 'readwrite');
+            const store = tx.objectStore(storeName);
+            // Handle both single object and array of objects
+            if (Array.isArray(data)) {
+                data.forEach(item => store.put(item));
+            } else {
+                store.put(data);
+            }
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        });
+    },
+
+    clear: function (storeName) {
+        return new Promise((resolve, reject) => {
+            const tx = this.db.transaction(storeName, 'readwrite');
+            const store = tx.objectStore(storeName);
+            store.clear();
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        });
+    },
+
+    delete: function (storeName, key) {
+        return new Promise((resolve, reject) => {
+            const tx = this.db.transaction(storeName, 'readwrite');
+            const store = tx.objectStore(storeName);
+            store.delete(key);
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        });
+    }
+};
+
 // --- Initialization ---
 let isInitialized = false;
-function init() {
+async function init() {
     if (isInitialized) return;
     isInitialized = true;
 
     try {
-        // Load Favorites
+        await DB.open();
+
+        // --- Migration Logic ---
+        // Check if we have localStorage data but empty DB
         const savedFavs = localStorage.getItem('stock_favorites');
-        if (savedFavs) {
-            // ... (keep existing load logic if needed, but for replace ease I'll match the block or use smaller chunks)
-
-            // Let's do smaller chunks to avoid large replacements unless necessary.
-            // I will replace init and the event listener first.
-
-            State.favorites = new Set(JSON.parse(savedFavs));
-        }
-
-        // Load Tabs
         const savedTabs = localStorage.getItem('stock_tabs');
-        if (savedTabs) {
-            State.tabs = JSON.parse(savedTabs);
+
+        // If LS exists, migrate it
+        if (savedFavs || savedTabs) {
+            console.log("Migrating data from LocalStorage to IndexedDB...");
+
+            if (savedFavs) {
+                const favCodes = JSON.parse(savedFavs); // Array of strings
+                // Convert to object array for store: { code: '...' }
+                const favObjects = favCodes.map(c => ({ code: c }));
+                await DB.put('favorites', favObjects);
+                localStorage.removeItem('stock_favorites');
+            }
+
+            if (savedTabs) {
+                const tabs = JSON.parse(savedTabs);
+                await DB.put('uploads', tabs);
+                localStorage.removeItem('stock_tabs');
+            }
+            console.log("Migration complete.");
         }
+
+        // --- Load from DB ---
+        const favs = await DB.getAll('favorites');
+        State.favorites = new Set(favs.map(f => f.code));
+
+        const tabs = await DB.getAll('uploads');
+        State.tabs = tabs || [];
+
     } catch (e) {
-        console.warn("Init load failed:", e);
+        console.error("Init/Migration failed:", e);
+        alert("Failed to initialize database. see console.");
     }
 
     // Bind Search Input Enter Key
@@ -627,7 +718,8 @@ let pendingAction = null;
 function removeTab(id) {
     pendingAction = () => {
         State.tabs = State.tabs.filter(t => t.id !== id);
-        saveTabs();
+        // DB Delete
+        DB.delete('uploads', id).catch(console.error);
 
         if (State.activeTabId === id) {
             switchTab('favorites');
@@ -649,7 +741,7 @@ function closeModal(confirmed) {
 function clearFavorites() {
     pendingAction = () => {
         State.favorites.clear();
-        localStorage.removeItem('stock_favorites');
+        DB.clear('favorites').catch(console.error);
         renderApp();
     };
     document.getElementById('confirm-modal').style.display = 'flex';
@@ -681,7 +773,15 @@ function toggleFavorite(code) {
     } else {
         State.favorites.add(code);
     }
-    localStorage.setItem('stock_favorites', JSON.stringify(Array.from(State.favorites)));
+
+    // DB Update: We can just put/delete or rewrite all. 
+    // For favorites, simple put/delete is efficient.
+    if (State.favorites.has(code)) {
+        DB.put('favorites', { code: code }).catch(console.error);
+    } else {
+        DB.delete('favorites', code).catch(console.error);
+    }
+    // localStorage.setItem('stock_favorites', JSON.stringify(Array.from(State.favorites)));
 
     // Helper to refresh UI specifically for stars without full re-render? 
     // For now full re-render is safer and fast enough.
@@ -733,12 +833,20 @@ function exportFavorites() {
 }
 
 function saveTabs() {
-    try {
-        localStorage.setItem('stock_tabs', JSON.stringify(State.tabs));
-    } catch (e) {
-        console.error("Using storage failed", e);
-        alert("Storage full! Changes saved to memory only.");
-    }
+    // This is now mainly used when we modify tabs (e.g. rename or update? currently barely used except import)
+    // Actually, processFile calls this indirectly via State update? No, processFile pushes to State.tabs then needs to save.
+    // We need to verify where saveTabs is called.
+    // It's called in removeTab. And likely should be called in processFile.
+
+    // With DB, we usually save individual items.
+    // We'll mimic the old behavior: Save all tabs? No, that's inefficient.
+    // But State.tabs is in memory.
+    // For now, let's keep the function signature but make it async-ish (fire and forget)
+
+    // Actually, checking usages:
+    // removeTab calls it.
+    // processFile *should* call it.
+    // Let's rely on explicit DB puts.
 }
 
 
@@ -857,8 +965,15 @@ function processFile(file) {
                 };
 
                 State.tabs.push(newTab);
-                saveTabs();
-                switchTab(tabId);
+
+                // DB Put
+                DB.put('uploads', newTab).then(() => {
+                    switchTab(tabId);
+                }).catch(err => {
+                    console.error("Failed to save imported tab", err);
+                    alert("Import successful but failed to save to database.");
+                    switchTab(tabId);
+                });
             } else {
                 alert("No valid stock data found.");
             }
