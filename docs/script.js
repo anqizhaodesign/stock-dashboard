@@ -686,30 +686,52 @@ function filterAgencies(query) {
 }
 
 function applyFilter(type, value) {
-    if (type === 'concept') {
-        if (value === 'ALL') {
-            State.filters.concept.clear();
+    const filterSet = type === 'concept' ? State.filters.concept : State.filters.agency;
+
+    if (value === 'ALL') {
+        filterSet.clear();
+    } else {
+        if (filterSet.has(value)) {
+            filterSet.delete(value);
         } else {
-            if (State.filters.concept.has(value)) {
-                State.filters.concept.delete(value);
-            } else {
-                State.filters.concept.add(value);
-            }
-        }
-    } else if (type === 'agency') {
-        if (value === 'ALL') {
-            State.filters.agency.clear();
-        } else {
-            if (State.filters.agency.has(value)) {
-                State.filters.agency.delete(value);
-            } else {
-                State.filters.agency.add(value);
-            }
+            filterSet.add(value);
         }
     }
 
     State.pagination.current = 1;
-    renderApp();
+
+    // update UI without destroying search input focus
+    updateFilterTagsUI(type);
+
+    // Partial Render
+    if (State.viewMode === 'list') {
+        renderList();
+    } else {
+        renderGrid();
+    }
+    renderPagination();
+}
+
+function updateFilterTagsUI(type) {
+    const listId = type === 'concept' ? 'concept-tags-list' : 'agency-tags-list';
+    const list = document.getElementById(listId);
+    if (!list) return;
+
+    const filterSet = type === 'concept' ? State.filters.concept : State.filters.agency;
+    const tags = list.getElementsByClassName('filter-tag');
+
+    for (let i = 0; i < tags.length; i++) {
+        const tag = tags[i];
+        const text = tag.textContent;
+
+        if (text === 'All') {
+            if (filterSet.size === 0) tag.classList.add('active');
+            else tag.classList.remove('active');
+        } else {
+            if (filterSet.has(text)) tag.classList.add('active');
+            else tag.classList.remove('active');
+        }
+    }
 }
 
 // --- Modal Logic ---
