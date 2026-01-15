@@ -12,7 +12,9 @@ const State = {
         agency: new Set()   // Set of strings
     },
     viewMode: 'grid', // 'grid' or 'list'
-    gridColumns: 'auto' // 'auto', 3, 4, 5, 6
+    viewMode: 'grid', // 'grid' or 'list'
+    gridColumns: 'auto', // 'auto', 3, 4, 5, 6
+    klinePeriod: 'W' // 'D' (Daily), 'W' (Weekly), 'M' (Monthly)
 };
 
 // --- IndexedDB Helper ---
@@ -215,6 +217,11 @@ function updateGridColumns(cols) {
     renderGrid();
 }
 
+function updateKlinePeriod(period) {
+    State.klinePeriod = period;
+    renderGrid(); // Only affects grid
+}
+
 function renderViewToggle() {
     const toggleContainer = document.getElementById('view-toggle-container');
     if (!toggleContainer) return;
@@ -249,6 +256,15 @@ function renderViewToggle() {
 
              <!-- Grid Mode Controls -->
             ${showGridCols ? `
+            <div class="control-group" style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text-secondary); margin-right: 12px; padding-right: 12px; border-right: 1px solid #ddd;">
+                <span>Period:</span>
+                <select onchange="updateKlinePeriod(this.value)" style="padding:4px; border-radius:4px; border:1px solid #ddd; font-weight:600; color: #333;">
+                    <option value="D" ${State.klinePeriod === 'D' ? 'selected' : ''}>Day</option>
+                    <option value="W" ${State.klinePeriod === 'W' ? 'selected' : ''}>Week</option>
+                    <option value="M" ${State.klinePeriod === 'M' ? 'selected' : ''}>Month</option>
+                </select>
+            </div>
+            
             <div class="control-group" style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text-secondary);">
                 <span>Columns:</span>
                 <select onchange="updateGridColumns(this.value)" style="padding:4px; border-radius:4px; border:1px solid #ddd;">
@@ -1033,7 +1049,7 @@ function getEastmoneyUrl(code) {
     if (prefix === 'sh') mkt = '1';
 
     const nid = `${mkt}.${code}`;
-    return `https://webquoteklinepic.eastmoney.com/GetPic.aspx?nid=${nid}&type=W&unitWidth=-6&ef=&formula=RSI&AT=1&imageType=KXL&timespan=${Date.now()}`;
+    return `https://webquoteklinepic.eastmoney.com/GetPic.aspx?nid=${nid}&type=${State.klinePeriod}&unitWidth=-6&ef=&formula=RSI&AT=1&imageType=KXL&timespan=${Date.now()}`;
 }
 
 // Start
