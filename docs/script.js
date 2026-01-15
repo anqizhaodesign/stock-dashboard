@@ -603,12 +603,16 @@ function renderGrid() {
         // Trigger ECharts Render
         const chartDiv = card.querySelector('.chart-container');
 
-        fetchKlineData(code).then(data => {
-            if (!data || data.error) {
-                chartDiv.innerHTML = `<div style="display:flex;justify-content:center;align-items:center;height:100%;color:#999;font-size:12px;">${data?.error || 'No Data'}</div>`;
+        Promise.all([
+            fetchKlineData(code),
+            fetchStockNews(code, prefix === 'sh' ? '1' : '2') // 1=SH, 2=SZ/BJ roughly
+        ]).then(([klineData, newsData]) => {
+            if (!klineData || klineData.error) {
+                chartDiv.innerHTML = `<div style="display:flex;justify-content:center;align-items:center;height:100%;color:#999;font-size:12px;">${klineData?.error || 'No Data'}</div>`;
                 return;
             }
-            renderChart(chartDiv, data);
+            // Pass news data to renderChart
+            renderChart(chartDiv, klineData, newsData);
         }).catch(err => {
             chartDiv.innerHTML = '<div style="display:flex;justify-content:center;align-items:center;height:100%;color:red;font-size:12px;">Load Error</div>';
         });
@@ -1113,13 +1117,118 @@ async function fetchKlineData(code) {
     }
 }
 
-function renderChart(container, data) {
+async function fetchStockNews(code, marketType) {
+    // defaults
+    if (!marketType) marketType = '2';
+
+    // Date range: Last 2 years to now
+    const now = new Date();
+    const end = now.toISOString().split('T')[0];
+    const startObj = new Date();
+    startObj.setFullYear(now.getFullYear() - 2);
+    const start = startObj.toISOString().split('T')[0];
+
+    // Use JSONP to bypass CORS
+    return new Promise((resolve) => {
+        const callbackName = 'jsonp_news_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+
+        // Timeout
+        const timeout = setTimeout(() => {
+            cleanup();
+            console.warn("News fetch timeout");
+            resolve([]);
+        }, 5000);
+
+        function cleanup() {
+            delete window[callbackName];
+            if (script && script.parentNode) script.parentNode.removeChild(script);
+            clearTimeout(timeout);
+        }
+
+        window[callbackName] = (res) => {
+            cleanup();
+            if (res && res.Data && Array.isArray(res.Data)) {
+                resolve(res.Data);
+            } else {
+                resolve([]);
+            }
+        };
+
+        const script = document.createElement('script');
+        // Add cb parameter
+        script.src = `https://cmsdataapi.eastmoney.com/api/infomine?code=${code}&marketType=${marketType}&types=1,2&startTime=${start}&endTime=${end}&format=yyyy-MM-dd&cb=${callbackName}`;
+        script.onerror = () => {
+            cleanup();
+            console.warn("News fetch script error");
+            resolve([]);
+        };
+
+        document.body.appendChild(script);
+    });
+}
+
+function renderChart(container, data, newsList = []) {
     if (!data || data.values.length === 0) {
         container.innerHTML = '<div style="display:flex;justify-content:center;align-items:center;height:100%;color:#999;font-size:12px;">No Data</div>';
         return;
     }
 
     const myChart = echarts.init(container);
+
+    // Process News for MarkPoints
+    const markPointData = [];
+    if (newsList && newsList.length > 0) {
+        // Map news to dates. Since we might have multiple news per day, we need logic.
+        // For simplicity, we just mark the day.
+
+        // We need to match news dates to chart dates (data.dates)
+        // Chart dates are typically "2024-01-01".
+
+        // Group by date
+        const newsByDate = {};
+        newsList.forEach(item => {
+            // item.Time is "yyyy-MM-dd hh:mm:ss" or "yyyy-MM-dd"
+            let dateStr = item.Time;
+            if (dateStr.length > 10) dateStr = dateStr.substring(0, 10);
+
+            if (!newsByDate[dateStr]) newsByDate[dateStr] = [];
+            newsByDate[dateStr].push(item);
+        });
+
+        // Create markers
+        // We only mark if the date exists in the chart data (to avoid placement errors)
+        // Or ECharts handles non-existent categories gracefully? Usually it needs exact match for category axis.
+
+        // Let's iterate chart dates to find matches (or vice versa)
+        data.dates.forEach((d, idx) => {
+            if (newsByDate[d]) {
+                const items = newsByDate[d];
+                const distinctTypes = new Set(items.map(i => i.Type));
+                let symbolColor = '#333'; // Default black
+                if (distinctTypes.has(2)) symbolColor = '#ef232a'; // Red for notices? Or just keep black as requested.
+                // User asked for "black little markers".
+
+                markPointData.push({
+                    name: 'News',
+                    coord: [d, data.values[idx][3]], // [Date, High] - place on top of high
+                    value: items.length, // Show count? or just a symbol
+                    symbol: 'arrow',
+                    symbolSize: 8,
+                    symbolRotate: 180, // Point down
+                    symbolOffset: [0, -10], // Slightly above
+                    itemStyle: { color: '#333' },
+                    tooltip: {
+                        formatter: () => {
+                            // Custom tooltip list
+                            return items.map(i => `• ${i.Title}`).join('<br/>');
+                        }
+                    },
+                    // Custom data to hold Titles for click/hover
+                    newsItems: items
+                });
+            }
+        });
+    }
 
     // Determine colors (Red up, Green down for CN market)
     const upColor = '#ef232a';
@@ -1185,6 +1294,29 @@ function renderChart(container, data) {
                     color0: downColor,
                     borderColor: upBorderColor,
                     borderColor0: downBorderColor
+                },
+                markPoint: {
+                    symbol: 'pin', // 'arrow' set above individually
+                    data: markPointData,
+                    label: { show: false }, // Don't show the count number
+                    tooltip: {
+                        show: true,
+                        backgroundColor: '#rgba(255,255,255,0.9)',
+                        borderColor: '#ccc',
+                        borderWidth: 1,
+                        textStyle: { color: '#333', fontSize: 10 },
+                        formatter: function (params) {
+                            if (params.data && params.data.newsItems) {
+                                const lines = params.data.newsItems.slice(0, 5).map(i => {
+                                    const t = i.Title.length > 20 ? i.Title.substring(0, 20) + '...' : i.Title;
+                                    return `• ${t}`;
+                                });
+                                if (params.data.newsItems.length > 5) lines.push(`... (+${params.data.newsItems.length - 5})`);
+                                return lines.join('<br>');
+                            }
+                            return params.name;
+                        }
+                    }
                 }
             },
             // MA Lines (Optional, skipping for minimal load first)
