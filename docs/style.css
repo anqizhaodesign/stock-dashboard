@@ -138,7 +138,8 @@ body {
     display: flex;
     flex-direction: column;
     height: 100vh;
-    overflow: hidden;
+    overflow-y: auto;
+    /* Enable scroll on main container */
     background-color: #FAFBFE;
 }
 
@@ -239,7 +240,8 @@ body {
 
 .scroll-area {
     flex: 1;
-    overflow-y: auto;
+    overflow: visible;
+    /* Let it expand */
 }
 
 .chart-card {
