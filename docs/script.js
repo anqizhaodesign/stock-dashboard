@@ -561,10 +561,12 @@ function renderGrid() {
 
         const { prefix } = getStockInfo(code);
         const imageUrl = getEastmoneyUrl(code);
-        // Link to Eastmoney Quote
+        // Determine Link URL (Full Screen Chart)
+        // BJ stocks need /bj/code.html
+        // Others use /prefixcode.html (e.g. sh600xxx, sz000xxx)
         const linkUrl = prefix === 'bj'
-            ? `https://quote.eastmoney.com/bj/${code}.html`
-            : `https://quote.eastmoney.com/${prefix}${code}.html`;
+            ? `https://quote.eastmoney.com/bj/${code}.html#fullScreenChart`
+            : `https://quote.eastmoney.com/${prefix}${code}.html#fullScreenChart`;
 
         const isFav = State.favorites.has(code);
         const starClass = isFav ? 'star-btn active' : 'star-btn';
