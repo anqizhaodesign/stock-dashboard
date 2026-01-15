@@ -817,8 +817,14 @@ function exportFavorites() {
     const rawList = getRawCurrentList(); // Logic inside handles looking up favs
 
     rawList.forEach(stock => {
+        const { prefix } = getStockInfo(stock.c);
+        let suffix = '.SZ';
+        if (prefix === 'sh') suffix = '.SH';
+        if (prefix === 'bj') suffix = '.BJ';
+        const formattedCode = stock.c + suffix;
+
         data.push([
-            stock.c,
+            formattedCode,
             stock.n || '',
             (stock.a || []).join('; '),
             stock.i || '',
