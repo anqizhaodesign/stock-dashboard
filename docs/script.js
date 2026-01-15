@@ -1073,7 +1073,7 @@ async function fetchKlineData(code) {
     if (State.klinePeriod === 'W') klt = 102;
     if (State.klinePeriod === 'M') klt = 103;
 
-    const url = `https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=${secidPrefix}.${code}&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f57&klt=${klt}&fqt=1&beg=0&end=20500000&lmt=120`;
+    const url = `https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=${secidPrefix}.${code}&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f57&klt=${klt}&fqt=1&beg=0&end=20500000&lmt=120&_=${Date.now()}`;
 
     try {
         const response = await fetch(url);
