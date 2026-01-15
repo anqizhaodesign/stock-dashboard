@@ -559,6 +559,11 @@ function renderGrid() {
 
         const iframeUrl = `https://quote.eastmoney.com/newstatic/html/profitchart_new.html?code=${code}${suffix}`;
 
+        // Link to Eastmoney Quote
+        const linkUrl = prefix === 'bj'
+            ? `https://quote.eastmoney.com/bj/${code}.html`
+            : `https://quote.eastmoney.com/${prefix}${code}.html`;
+
         const isFav = State.favorites.has(code);
         const starClass = isFav ? 'star-btn active' : 'star-btn';
         const starIcon = isFav ? '★' : '☆';
