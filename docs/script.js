@@ -551,10 +551,13 @@ function renderGrid() {
         card.className = 'chart-card';
 
         const { prefix } = getStockInfo(code);
-        // Map prefix to Market ID for Eastmoney Unify Chart
-        // sh -> 1, sz -> 0, bj -> 0
-        const marketId = (prefix === 'sh') ? '1' : '0';
-        const iframeUrl = `https://quote.eastmoney.com/unify/cr/${marketId}.${code}`;
+
+
+        let suffix = '.SZ';
+        if (prefix === 'sh') suffix = '.SH';
+        if (prefix === 'bj') suffix = '.BJ';
+
+        const iframeUrl = `https://quote.eastmoney.com/newstatic/html/profitchart_new.html?code=${code}${suffix}`;
 
         const isFav = State.favorites.has(code);
         const starClass = isFav ? 'star-btn active' : 'star-btn';
