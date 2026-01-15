@@ -558,8 +558,9 @@ function renderGrid() {
         if (prefix === 'sh') marketId = '1';
         if (prefix === 'bj') marketId = '0';
 
-        // type=k gives Day/Week/Month tabs (Standard K-Line)
-        const iframeUrl = `https://quote.eastmoney.com/basic/h5chart-iframe.html?code=${code}&market=${marketId}&type=k`;
+        // type=wk gives Weekly K-Line default (requested by user)
+        // type=k (Day), type=mk (Month)
+        const iframeUrl = `https://quote.eastmoney.com/basic/h5chart-iframe.html?code=${code}&market=${marketId}&type=wk`;
 
         // Link to Eastmoney Quote
         const linkUrl = prefix === 'bj'
@@ -591,8 +592,9 @@ function renderGrid() {
                 </div>
             </div>
             <div class="card-body" style="height: 300px; padding: 0; overflow:hidden;">
+                <!-- -126px margin-top to hide standard header and tab bar -->
                 <iframe src="${iframeUrl}" 
-                    style="width: 100%; height: 100%; border: none;" 
+                    style="width: 100%; height: 500px; border: none; margin-top: -126px;" 
                     loading="lazy"
                     title="${name} Chart">
                 </iframe>
