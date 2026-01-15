@@ -1146,6 +1146,16 @@ function renderChart(container, data) {
                 return obj;
             }
         },
+        // Show only last ~40 candles by default to make granularity obvious
+        dataZoom: [
+            {
+                type: 'inside',
+                xAxisIndex: [0],
+                start: 0,
+                end: 100,
+                startValue: Math.max(0, data.values.length - 40)
+            }
+        ],
         xAxis: {
             type: 'category',
             data: data.dates,
