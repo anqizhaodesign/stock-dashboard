@@ -254,17 +254,8 @@ function renderViewToggle() {
                 </select>
             </div>
 
-             <!-- Grid Mode Controls -->
+            <!-- Grid Mode Controls -->
             ${showGridCols ? `
-            <div class="control-group" style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text-secondary); margin-right: 12px; padding-right: 12px; border-right: 1px solid #ddd;">
-                <span>Period:</span>
-                <select onchange="updateKlinePeriod(this.value)" style="padding:4px; border-radius:4px; border:1px solid #ddd; font-weight:600; color: #333;">
-                    <option value="D" ${State.klinePeriod === 'D' ? 'selected' : ''}>Day</option>
-                    <option value="W" ${State.klinePeriod === 'W' ? 'selected' : ''}>Week</option>
-                    <option value="M" ${State.klinePeriod === 'M' ? 'selected' : ''}>Month</option>
-                </select>
-            </div>
-            
             <div class="control-group" style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text-secondary);">
                 <span>Columns:</span>
                 <select onchange="updateGridColumns(this.value)" style="padding:4px; border-radius:4px; border:1px solid #ddd;">
@@ -560,11 +551,10 @@ function renderGrid() {
         card.className = 'chart-card';
 
         const { prefix } = getStockInfo(code);
-        const imageUrl = getEastmoneyUrl(code);
-        // Link to Eastmoney Quote
-        const linkUrl = prefix === 'bj'
-            ? `https://quote.eastmoney.com/bj/${code}.html`
-            : `https://quote.eastmoney.com/${prefix}${code}.html`;
+        // Map prefix to Market ID for Eastmoney Unify Chart
+        // sh -> 1, sz -> 0, bj -> 0
+        const marketId = (prefix === 'sh') ? '1' : '0';
+        const iframeUrl = `https://quote.eastmoney.com/unify/cr/${marketId}.${code}`;
 
         const isFav = State.favorites.has(code);
         const starClass = isFav ? 'star-btn active' : 'star-btn';
@@ -590,15 +580,12 @@ function renderGrid() {
                     ¥${price}
                 </div>
             </div>
-            <div class="card-body">
-                <div style="position: relative; width: 100%; height:100%; display:flex; justify-content:center;">
-                     <a href="${linkUrl}" target="_blank" style="display: block; cursor: pointer; width:100%;">
-                        <div class="loading">Loading...</div>
-                        <img src="${imageUrl}" class="chart-img" loading="lazy" 
-                            onload="this.previousElementSibling.style.display='none'" 
-                            onerror="this.previousElementSibling.innerText='Ind. unavailable'">
-                    </a>
-                </div>
+            <div class="card-body" style="height: 300px; padding: 0; overflow:hidden;">
+                <iframe src="${iframeUrl}" 
+                    style="width: 100%; height: 100%; border: none;" 
+                    loading="lazy"
+                    title="${name} Chart">
+                </iframe>
             </div>
             <div class="card-footer">
                 <div class="agency-list" title="${agencyText || 'No Agency Data'}">
