@@ -1308,7 +1308,8 @@ function renderChart(container, data, newsList = []) {
                     show: true,
                     trigger: 'item',
                     enterable: true, // Clickable links
-                    position: 'top', // Show above the arrow
+                    confine: true,   // Ensure it stays within container
+                    position: 'bottom', // Show below the arrow (since arrow is at top)
                     formatter: function (p) {
                         if (p.data && p.data.newsItems) {
                             let content = `<div style="max-width:300px; white-space:normal;"><b>${p.name} News</b><hr style="margin:5px 0;border:0;border-top:1px solid #ddd;"/>`;
