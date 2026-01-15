@@ -1151,9 +1151,8 @@ function renderChart(container, data) {
             {
                 type: 'inside',
                 xAxisIndex: [0],
-                start: 0,
-                end: 100,
-                startValue: Math.max(0, data.values.length - 40)
+                startValue: Math.max(0, data.values.length - 40),
+                endValue: data.values.length - 1
             }
         ],
         xAxis: {
