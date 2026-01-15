@@ -1054,3 +1054,124 @@ function getEastmoneyUrl(code) {
 
 // Start
 document.addEventListener('DOMContentLoaded', init);
+
+// --- ECharts Implementation ---
+
+async function fetchKlineData(code) {
+    const { prefix } = getStockInfo(code);
+    // Market ID: sh=1, sz=0, bj=0
+    let secidPrefix = '0';
+    if (prefix === 'sh') secidPrefix = '1';
+
+    // API: https://push2his.eastmoney.com/api/qt/stock/kline/get
+    // klt=102 (Week), lmt=120 (approx 2 years)
+    const url = `https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=${secidPrefix}.${code}&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f57&klt=102&fqt=1&beg=0&end=20500000&lmt=120`;
+
+    try {
+        const response = await fetch(url);
+        const json = await response.json();
+        const klines = json?.data?.klines || [];
+
+        // Parse data for ECharts
+        // API format: "2024-01-01,Open,Close,High,Low,Vol"
+        // ECharts Candlestick: [Open, Close, Lowest, Highest]
+        const dates = [];
+        const values = []; // [Open, Close, Low, High]
+        const volumes = [];
+
+        klines.forEach(item => {
+            const parts = item.split(',');
+            dates.push(parts[0]);
+            // parts: 0=Date, 1=Open, 2=Close, 3=High, 4=Low, 5=Vol
+            // ECharts expects: [Open, Close, Low, High]
+            values.push([
+                parseFloat(parts[1]), // Open
+                parseFloat(parts[2]), // Close
+                parseFloat(parts[4]), // Low (Lowest)
+                parseFloat(parts[3]), // High (Highest)
+            ]);
+            volumes.push(parseFloat(parts[5]));
+        });
+
+        return { dates, values, volumes };
+    } catch (e) {
+        console.error("Failed to fetch kline data", e);
+        return null;
+    }
+}
+
+function renderChart(container, data) {
+    if (!data || data.values.length === 0) {
+        container.innerHTML = '<div style="display:flex;justify-content:center;align-items:center;height:100%;color:#999;font-size:12px;">No Data</div>';
+        return;
+    }
+
+    const myChart = echarts.init(container);
+
+    // Determine colors (Red up, Green down for CN market)
+    const upColor = '#ef232a';
+    const upBorderColor = '#ef232a';
+    const downColor = '#14b143';
+    const downBorderColor = '#14b143';
+
+    const option = {
+        grid: {
+            left: '5%',
+            right: '2%',
+            top: '5%',
+            bottom: '15%', // Simple layout
+            containLabel: true
+        },
+        tooltip: {
+            trigger: 'axis',
+            axisPointer: {
+                type: 'cross'
+            },
+            position: function (pos, params, el, elRect, size) {
+                const obj = { top: 10 };
+                obj[['left', 'right'][+(pos[0] < size.viewSize[0] / 2)]] = 30;
+                return obj;
+            }
+        },
+        xAxis: {
+            type: 'category',
+            data: data.dates,
+            boundaryGap: true,
+            axisLine: { onZero: false },
+            splitLine: { show: false },
+            axisLabel: { show: false }, // Hide dates to save space in small card
+            axisTick: { show: false }
+        },
+        yAxis: {
+            scale: true,
+            splitNumber: 3, // Fewer grid lines
+            splitArea: {
+                show: true
+            },
+            axisLabel: {
+                fontSize: 10,
+                color: '#999'
+            }
+        },
+        series: [
+            {
+                name: 'K-Line',
+                type: 'candlestick',
+                data: data.values,
+                itemStyle: {
+                    color: upColor,
+                    color0: downColor,
+                    borderColor: upBorderColor,
+                    borderColor0: downBorderColor
+                }
+            },
+            // MA Lines (Optional, skipping for minimal load first)
+        ]
+    };
+
+    myChart.setOption(option);
+
+    // Handle resize
+    // We can use ResizeObserver in the main loop if we want perfect resizing, 
+    // or just rely on fixed size for now.
+}
