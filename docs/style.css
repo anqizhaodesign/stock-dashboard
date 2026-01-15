@@ -285,7 +285,7 @@ body {
 }
 
 .card-body {
-    padding: 10px;
+    padding: 0;
     flex-grow: 1;
     display: flex;
     align-items: center;
@@ -296,7 +296,7 @@ body {
 }
 
 .card-footer {
-    padding: 10px 16px;
+    padding: 8px 10px;
     background-color: #FAFBFE;
     border-top: 1px solid var(--border-color);
     font-size: 11px;
@@ -341,9 +341,6 @@ body {
     /* Fill width */
     height: auto;
     /* Maintain aspect ratio */
-    max-height: 200px;
-    /* Prevent it from being too tall if wide */
-    object-fit: contain;
     display: block;
 }
 
