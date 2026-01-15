@@ -593,8 +593,9 @@ function renderGrid() {
             </div>
             <div class="card-body" style="height: 300px; padding: 0; overflow:hidden;">
                 <!-- -126px margin-top to hide standard header and tab bar -->
+                <!-- transform: scale(0.75) with width: 133% makes the internal viewport ~400px wide, rendered in 300px space -->
                 <iframe src="${iframeUrl}" 
-                    style="width: 100%; height: 500px; border: none; margin-top: -126px; overflow:hidden;" 
+                    style="width: 133%; height: 666px; border: none; margin-top: -126px; overflow:hidden; transform: scale(0.75); transform-origin: left top;" 
                     scrolling="no"
                     loading="lazy"
                     title="${name} Chart">
