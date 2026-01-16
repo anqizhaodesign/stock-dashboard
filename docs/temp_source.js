@@ -14,9 +14,7 @@ const State = {
     viewMode: 'grid', // 'grid' or 'list'
     viewMode: 'grid', // 'grid' or 'list'
     gridColumns: 'auto', // 'auto', 3, 4, 5, 6
-    gridColumns: 'auto', // 'auto', 3, 4, 5, 6
-    klinePeriod: 'W', // 'D' (Daily), 'W' (Weekly), 'M' (Monthly)
-    chartMode: 'h5' // 'web' (Full Site) or 'h5' (Clean Iframe)
+    klinePeriod: 'W' // 'D' (Daily), 'W' (Weekly), 'M' (Monthly)
 };
 
 // --- IndexedDB Helper ---
@@ -224,11 +222,6 @@ function updateKlinePeriod(period) {
     renderGrid(); // Only affects grid
 }
 
-function updateChartMode(mode) {
-    State.chartMode = mode;
-    renderGrid();
-}
-
 function renderViewToggle() {
     const toggleContainer = document.getElementById('view-toggle-container');
     if (!toggleContainer) return;
@@ -283,15 +276,6 @@ function renderViewToggle() {
                 </select>
             </div>
             ` : ''}
-
-            <!-- Chart Mode Selector -->
-            <div class="control-group" style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text-secondary); margin-left:12px; padding-left:12px; border-left:1px solid #ddd;">
-                <span>Source:</span>
-                <select onchange="updateChartMode(this.value)" style="padding:4px; border-radius:4px; border:1px solid #ddd; font-weight:600; color: #333;">
-                    <option value="web" ${State.chartMode === 'web' ? 'selected' : ''}>Web (Full)</option>
-                    <option value="h5" ${State.chartMode === 'h5' ? 'selected' : ''}>H5 (Lite)</option>
-                </select>
-            </div>
         </div>
     `;
 }
@@ -576,69 +560,40 @@ function renderGrid() {
         card.className = 'chart-card';
 
         const { prefix } = getStockInfo(code);
-        const imageUrl = getEastmoneyUrl(code);
+        // Determine Link URL (H5 Chart with params)
+        // Market: 1=SH, 2=SZ (and likely BJ)
+        const marketParam = prefix === 'sh' ? '1' : '2';
+        // Period: D->k, W->wk, M->mk
+        const periodMap = { 'D': 'k', 'W': 'wk', 'M': 'mk' };
+        const typeParam = periodMap[State.klinePeriod] || 'wk';
 
-        // Determine Link URL (Full Screen Chart)
-        let linkUrl;
-
-        if (State.chartMode === 'h5') {
-            // H5 Mode Logic
-            // market: 1=SH, 2=SZ/BJ/KCB
-            // type: k=Daily, wk=Weekly, mk=Monthly
-            let marketParam = (prefix === 'sh') ? 1 : 2;
-            let typeParam = 'wk'; // default
-            if (State.klinePeriod === 'D') typeParam = 'k';
-            if (State.klinePeriod === 'M') typeParam = 'mk';
-
-            linkUrl = `https://quote.eastmoney.com/basic/h5chart-iframe.html?code=${code}&market=${marketParam}&type=${typeParam}`;
-        } else {
-            // Web Mode Logic (Existing)
-            if (prefix === 'bj') {
-                linkUrl = `https://quote.eastmoney.com/bj/${code}.html#fullScreenChart`;
-            } else if (code.startsWith('688') || code.startsWith('689')) {
-                linkUrl = `https://quote.eastmoney.com/kcb/${code}.html#fullScreenChart`;
-            } else {
-                linkUrl = `https://quote.eastmoney.com/${prefix}${code}.html#fullScreenChart`;
-            }
-        }
+        const linkUrl = `https://quote.eastmoney.com/basic/h5chart-iframe.html?code=${code}&market=${marketParam}&type=${typeParam}`;
 
         const isFav = State.favorites.has(code);
         const starClass = isFav ? 'star-btn active' : 'star-btn';
         const starIcon = isFav ? '★' : '☆';
 
-        // Join agencies for display
         const agencyText = agencies.length > 0 ? agencies.join(', ') : '';
 
         card.innerHTML = `
-            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px;">
+            <div class="card-header">
                 <div style="display:flex; align-items:center;">
                     <span class="${starClass}" onclick="toggleFavorite('${code}')" title="Toggle Favorite">${starIcon}</span>
-                    <div style="display:flex; flex-direction:column; margin-left: 8px;">
-                        <a href="${linkUrl}" 
-                            target="_blank" 
-                            onclick="openFullScreen('${linkUrl}'); return false;"
-                            style="color: inherit; text-decoration: none; font-weight:600; cursor:pointer; font-size: 14px;">
-                            ${truncate(name, 10)}
-                        </a>
-                        <span class="stock-code" style="font-size: 12px; color: #86909C;">${prefix.toUpperCase()}${code}</span>
+                    <div style="display:flex; flex-direction:column; margin-left: 5px;">
+                        <div>
+                             <a href="${linkUrl}" target="_blank" style="color: inherit; text-decoration: none; font-weight:600;">
+                                ${name}
+                            </a>
+                            <span class="stock-code">${prefix.toUpperCase()}${code}</span>
+                        </div>
                     </div>
                 </div>
-                <!-- Price Box (Top Right) -->
-                <div class="stock-info-box" id="info-${code}" style="border: 1px solid #ccc; border-radius: 4px; padding: 4px 8px; text-align: center; min-width: 80px;">
-                    <div class="current-price" style="font-size: 18px; font-weight: bold; color: #333; line-height: 1.2;">
-                        ¥${price}
-                    </div>
+                <div class="price-val" style="color: ${parseFloat(price) > 0 ? '#d00' : '#333'}">
+                    ¥${price}
                 </div>
             </div>
-            <div class="card-body">
-                <div style="position: relative; width: 100%; height:100%; display:flex; justify-content:center;">
-                     <a href="${linkUrl}" target="_blank" onclick="openFullScreen('${linkUrl}'); return false;" style="display: block; cursor: pointer; width:100%;">
-                        <div class="loading">Loading...</div>
-                        <img src="${imageUrl}" class="chart-img" loading="lazy" 
-                            onload="this.previousElementSibling.style.display='none'" 
-                            onerror="this.previousElementSibling.innerText='Ind. unavailable'">
-                    </a>
-                </div>
+            <div class="card-body" style="height: 300px; padding: 0;">
+                 <div class="chart-container" style="width:100%; height:100%;"></div>
             </div>
             <div class="card-footer">
                 <div class="agency-list" title="${agencyText || 'No Agency Data'}">
@@ -649,8 +604,22 @@ function renderGrid() {
         `;
         grid.appendChild(card);
 
-        // ALWAYS Fetch Detailed Data
-        fetchDetailedStockData(code, prefix);
+        // Trigger ECharts Render
+        const chartDiv = card.querySelector('.chart-container');
+
+        Promise.all([
+            fetchKlineData(code),
+            fetchStockNews(code, prefix === 'sh' ? '1' : '2') // 1=SH, 2=SZ/BJ roughly
+        ]).then(([klineData, newsData]) => {
+            if (!klineData || klineData.error) {
+                chartDiv.innerHTML = `<div style="display:flex;justify-content:center;align-items:center;height:100%;color:#999;font-size:12px;">${klineData?.error || 'No Data'}</div>`;
+                return;
+            }
+            // Pass news data to renderChart
+            renderChart(chartDiv, klineData, newsData);
+        }).catch(err => {
+            chartDiv.innerHTML = '<div style="display:flex;justify-content:center;align-items:center;height:100%;color:red;font-size:12px;">Load Error</div>';
+        });
     });
 }
 
@@ -1097,117 +1066,281 @@ function getEastmoneyUrl(code) {
 
 // Start
 document.addEventListener('DOMContentLoaded', init);
-// --- Full Screen Modal Logic ---
-function openFullScreen(url) {
-    const modal = document.getElementById('fullScreenModal');
-    const iframe = document.getElementById('chart-iframe');
-    if (modal && iframe) {
-        iframe.src = url;
-        modal.style.display = 'flex';
-        document.body.style.overflow = 'hidden'; // Prevent background scroll
+
+// --- ECharts Implementation ---
+
+async function fetchKlineData(code) {
+    const { prefix } = getStockInfo(code);
+    // Market ID: sh=1, sz=0, bj=0
+    let secidPrefix = '0';
+    if (prefix === 'sh') secidPrefix = '1';
+
+    // API: https://push2his.eastmoney.com/api/qt/stock/kline/get
+    // klt: 101=Day, 102=Week, 103=Month
+    let klt = 101;
+    if (State.klinePeriod === 'W') klt = 102;
+    if (State.klinePeriod === 'M') klt = 103;
+
+    const url = `https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=${secidPrefix}.${code}&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f57&klt=${klt}&fqt=1&beg=0&end=20500000&lmt=120&_=${Date.now()}`;
+
+    try {
+        const response = await fetch(url);
+        const json = await response.json();
+        const klines = json?.data?.klines || [];
+
+        // Parse data for ECharts
+        // API format: "2024-01-01,Open,Close,High,Low,Vol"
+        // ECharts Candlestick: [Open, Close, Lowest, Highest]
+        const dates = [];
+        const values = []; // [Open, Close, Low, High]
+        const volumes = [];
+
+        if (klines.length === 0) {
+            console.warn("No klines data for", code);
+            return null;
+        }
+
+        klines.forEach(item => {
+            const parts = item.split(',');
+            dates.push(parts[0]);
+            // parts: 0=Date, 1=Open, 2=Close, 3=High, 4=Low, 5=Vol
+            // ECharts expects: [Open, Close, Low, High]
+            values.push([
+                parseFloat(parts[1]), // Open
+                parseFloat(parts[2]), // Close
+                parseFloat(parts[4]), // Low (Lowest)
+                parseFloat(parts[3]), // High (Highest)
+            ]);
+            volumes.push(parseFloat(parts[5]));
+        });
+
+        return { dates, values, volumes };
+    } catch (e) {
+        console.error("Failed to fetch kline data", e);
+        return { error: e.message };
     }
 }
 
-function closeFullScreen() {
-    const modal = document.getElementById('fullScreenModal');
-    const iframe = document.getElementById('chart-iframe');
-    if (modal && iframe) {
-        modal.style.display = 'none';
-        iframe.src = ''; // Clear src to stop resource usage
-        document.body.style.overflow = ''; // Restore scroll
-    }
-}
+async function fetchStockNews(code, marketType) {
+    // defaults
+    if (!marketType) marketType = '2';
 
-function closeFullScreenIfOutside(e) {
-    if (e.target.id === 'fullScreenModal') {
-        closeFullScreen();
-    }
-}
+    // Date range: Last 2 years to now
+    const now = new Date();
+    const end = now.toISOString().split('T')[0];
+    const startObj = new Date();
+    startObj.setFullYear(now.getFullYear() - 2);
+    const start = startObj.toISOString().split('T')[0];
 
-// Helper function for string truncation
-function truncate(str, n) {
-    return (str.length > n) ? str.substr(0, n - 1) + '...' : str;
-}
-
-// --- API Helper: Fetch Detailed Stock Data (Price, 52W High/Low) ---
-function fetchDetailedStockData(code, prefix) {
+    // Use JSONP to bypass CORS
     return new Promise((resolve) => {
-        const secidPrefix = prefix === 'sh' ? '1' : '0';
-        const secid = `${secidPrefix}.${code}`;
-        const cbName = 'cb_details_' + code + '_' + Date.now();
+        const callbackName = 'jsonp_news_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
 
-        // f43: Price, f174: 52W High, f175: 52W Low, f169: Change %
-        // f107: Decimal precision
-        const url = `https://push2.eastmoney.com/api/qt/stock/get?secid=${secid}&fields=f43,f174,f175,f169,f107&cb=${cbName}&_=${Date.now()}`;
-
-        const cleanup = () => {
-            delete window[cbName];
-            if (script.parentNode) script.parentNode.removeChild(script);
-        };
-
-        window[cbName] = (json) => {
+        // Timeout
+        const timeout = setTimeout(() => {
             cleanup();
-            if (json && json.data) {
-                const d = json.data;
-                const precision = 2; // Forced precision
+            console.warn("News fetch timeout");
+            resolve([]);
+        }, 5000);
 
-                const format = (val) => {
-                    if (val === '-' || val === undefined) return '--';
-                    let num = parseFloat(val);
-                    if (isNaN(num)) return '--';
+        function cleanup() {
+            delete window[callbackName];
+            if (script && script.parentNode) script.parentNode.removeChild(script);
+            clearTimeout(timeout);
+        }
 
-                    if (Number.isInteger(num) || String(val).indexOf('.') === -1) {
-                        num = num / 100;
-                    }
-                    return num.toFixed(precision);
-                };
-
-                const price = format(d.f43);
-                const high = format(d.f174);
-                const low = format(d.f175);
-                const chgPct = d.f169;
-
-                const el = document.getElementById(`info-${code}`);
-                if (el) {
-                    let color = '#333';
-                    const chg = parseFloat(chgPct);
-                    if (chg > 0) color = '#f5222d';
-                    else if (chg < 0) color = '#52c41a';
-
-                    // Styling: Border Box with three values side by side
-                    el.style.border = `1px solid ${color}`;
-                    el.style.backgroundColor = '#fff';
-                    el.style.padding = '4px 8px';
-                    el.style.display = 'flex';
-                    el.style.flexDirection = 'row';
-                    el.style.alignItems = 'center';
-                    el.style.justifyContent = 'flex-end';
-                    el.style.gap = '12px';
-                    el.style.borderRadius = '4px';
-
-                    el.innerHTML = `
-                        <span style="font-size: 14px; font-weight: bold; color: ${color}; white-space: nowrap;">
-                            ¥${price}
-                        </span>
-                        <span style="font-size: 14px; color: #999; white-space: nowrap;">
-                            H:${high}
-                        </span>
-                        <span style="font-size: 14px; color: #999; white-space: nowrap;">
-                            L:${low}
-                        </span>
-                    `;
-                }
+        window[callbackName] = (res) => {
+            cleanup();
+            if (res && res.Data && Array.isArray(res.Data)) {
+                resolve(res.Data);
+            } else {
+                resolve([]);
             }
-            resolve(true);
         };
 
         const script = document.createElement('script');
-        script.src = url;
+        // Add cb parameter
+        script.src = `https://cmsdataapi.eastmoney.com/api/infomine?code=${code}&marketType=${marketType}&types=1,2&startTime=${start}&endTime=${end}&format=yyyy-MM-dd&cb=${callbackName}`;
         script.onerror = () => {
             cleanup();
-            console.warn("Fetch details failed for", code);
-            resolve(false);
+            console.warn("News fetch script error");
+            resolve([]);
         };
+
         document.body.appendChild(script);
     });
+}
+
+function renderChart(container, data, newsList = []) {
+    if (!data || data.values.length === 0) {
+        container.innerHTML = '<div style="display:flex;justify-content:center;align-items:center;height:100%;color:#999;font-size:12px;">No Data</div>';
+        return;
+    }
+
+    const myChart = echarts.init(container);
+
+    // Process News for Scatter Series (Fixed at top)
+    const newsScatterData = [];
+    if (newsList && newsList.length > 0) {
+        const newsByDate = {};
+        newsList.forEach(item => {
+            let dateStr = item.Time;
+            if (dateStr.length > 10) dateStr = dateStr.substring(0, 10);
+            if (!newsByDate[dateStr]) newsByDate[dateStr] = [];
+            newsByDate[dateStr].push(item);
+        });
+
+        data.dates.forEach((d) => {
+            if (newsByDate[d]) {
+                const items = newsByDate[d];
+                const distinctTypes = new Set(items.map(i => i.Type));
+                // Use Scatter data format: [X, Y, Extras]
+                // Y is fixed at '1' (top of secondary axis)
+                newsScatterData.push({
+                    value: [d, 1],
+                    newsItems: items,
+                    symbol: 'arrow', // Standard arrow
+                    symbolRotate: 180, // Point down
+                    itemStyle: { color: distinctTypes.has(2) ? '#333' : '#333' }
+                });
+            }
+        });
+    }
+
+    // Determine colors (Red up, Green down for CN market)
+    const upColor = '#ef232a';
+    const upBorderColor = '#ef232a';
+    const downColor = '#14b143';
+    const downBorderColor = '#14b143';
+
+    const option = {
+        grid: {
+            left: '5%',
+            right: '2%',
+            top: '12%', // Give more space at top for markers
+            bottom: '15%',
+            containLabel: true
+        },
+        tooltip: {
+            trigger: 'axis',
+            // enterable: true, // Only needed for news, but global axis tooltip usually doesn't need interactions
+            axisPointer: { type: 'cross' },
+            position: function (pos, params, el, elRect, size) {
+                const obj = { top: 10 };
+                obj[['left', 'right'][+(pos[0] < size.viewSize[0] / 2)]] = 30;
+                return obj;
+            },
+            // Global (Axis) Formatter: ONLY for K-Line and Volume
+            formatter: function (params) {
+                let result = '';
+                let date = '';
+
+                params.forEach(p => {
+                    if (!date) date = p.name || p.axisValue;
+
+                    if (p.seriesName === 'K-Line') {
+                        const val = p.value; // [index, open, close, low, high]
+                        result += `${p.marker} <b>${p.seriesName}</b><br/>
+                                   Open: ${val[1]}<br/>
+                                   Close: ${val[2]}<br/>
+                                   Low: ${val[3]}<br/>
+                                   High: ${val[4]}<br/>`;
+                    }
+                    // Ignore News here
+                });
+
+                if (!result) return ''; // Don't show if only news is hovered (though axis usually captures kline too)
+                return `<div><b>${date}</b><br/>${result}</div>`;
+            }
+        },
+        // Show only last ~40 candles by default to make granularity obvious
+        dataZoom: [
+            {
+                type: 'inside',
+                xAxisIndex: [0],
+                startValue: Math.max(0, data.values.length - 40),
+                endValue: data.values.length - 1
+            }
+        ],
+        xAxis: {
+            type: 'category',
+            data: data.dates,
+            boundaryGap: false,
+            axisLine: { onZero: false },
+            splitLine: { show: false },
+            min: 'dataMin',
+            max: 'dataMax',
+            axisLabel: {
+                show: true,
+                formatter: function (value) {
+                    // Try to show simpler date: MM-DD or YY-MM-DD
+                    // Value is typically "2025-01-01"
+                    return echarts.format.formatTime('MM-dd', value);
+                }
+            },
+            axisTick: { show: true }
+        },
+        yAxis: [
+            {
+                scale: true,
+                splitArea: { show: true }
+            },
+            {
+                type: 'value',
+                scale: true,
+                min: 0,
+                max: 1,
+                show: false, // Invisible dummy axis
+                position: 'right'
+            }
+        ],
+        series: [
+            {
+                name: 'K-Line',
+                type: 'candlestick',
+                data: data.values,
+                itemStyle: {
+                    color: upColor,
+                    color0: downColor,
+                    borderColor: upBorderColor,
+                    borderColor0: downBorderColor
+                },
+                // Removed markPoint, moved to Scatter
+            },
+            {
+                name: 'News',
+                type: 'scatter',
+                yAxisIndex: 1, // Use fixed 0-1 axis
+                symbolSize: 10,
+                data: newsScatterData,
+                z: 10, // On top
+                // Series-specific Tooltip (Item Trigger)
+                tooltip: {
+                    show: true,
+                    trigger: 'item',
+                    enterable: true, // Clickable links
+                    confine: true,   // Ensure it stays within container
+                    position: 'bottom', // Show below the arrow (since arrow is at top)
+                    formatter: function (p) {
+                        if (p.data && p.data.newsItems) {
+                            let content = `<div style="max-width:300px; white-space:normal;"><b>${p.name} News</b><hr style="margin:5px 0;border:0;border-top:1px solid #ddd;"/>`;
+                            p.data.newsItems.forEach(item => {
+                                content += `• <a href="${item.Url}" target="_blank" style="color:#007bff;text-decoration:none;">${item.Title}</a><br/>`;
+                            });
+                            content += '</div>';
+                            return content;
+                        }
+                        return '';
+                    }
+                }
+            },
+            // MA Lines (Optional, skipping for minimal load first)
+        ]
+    };
+
+    myChart.setOption(option);
+
+    // Handle resize
+    // We can use ResizeObserver in the main loop if we want perfect resizing, 
+    // or just rely on fixed size for now.
 }
