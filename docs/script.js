@@ -568,7 +568,7 @@ function renderGrid() {
         let linkUrl;
         if (prefix === 'bj') {
             linkUrl = `https://quote.eastmoney.com/bj/${code}.html#fullScreenChart`;
-        } else if (code.startsWith('688')) {
+        } else if (code.startsWith('688') || code.startsWith('689')) {
             linkUrl = `https://quote.eastmoney.com/kcb/${code}.html#fullScreenChart`;
         } else {
             linkUrl = `https://quote.eastmoney.com/${prefix}${code}.html#fullScreenChart`;
