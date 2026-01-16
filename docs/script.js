@@ -580,11 +580,14 @@ function renderGrid() {
                 <div style="display:flex; align-items:center;">
                     <span class="${starClass}" onclick="toggleFavorite('${code}')" title="Toggle Favorite">${starIcon}</span>
                     <div style="display:flex; flex-direction:column; margin-left: 5px;">
-                        <div>
-                             <a href="${linkUrl}" target="_blank" style="color: inherit; text-decoration: none; font-weight:600;">
-                                ${name}
-                            </a>
-                            <span class="stock-code">${prefix.toUpperCase()}${code}</span>
+                             <!-- Modified to open modal -->
+                             <a href="${linkUrl}" 
+                                target="_blank" 
+                                onclick="openFullScreen('${linkUrl}'); return false;"
+                                style="color: inherit; text-decoration: none; font-weight:600; cursor:pointer;">
+                                ${truncate(name, 10)}
+                             </a>
+                             <span class="stock-code">${prefix.toUpperCase()}${code}</span>
                         </div>
                     </div>
                 </div>
@@ -594,7 +597,7 @@ function renderGrid() {
             </div>
             <div class="card-body">
                 <div style="position: relative; width: 100%; height:100%; display:flex; justify-content:center;">
-                     <a href="${linkUrl}" target="_blank" style="display: block; cursor: pointer; width:100%;">
+                     <a href="${linkUrl}" target="_blank" onclick="openFullScreen('${linkUrl}'); return false;" style="display: block; cursor: pointer; width:100%;">
                         <div class="loading">Loading...</div>
                         <img src="${imageUrl}" class="chart-img" loading="lazy" 
                             onload="this.previousElementSibling.style.display='none'" 
@@ -1056,3 +1059,34 @@ function getEastmoneyUrl(code) {
 
 // Start
 document.addEventListener('DOMContentLoaded', init);
+// --- Full Screen Modal Logic ---
+function openFullScreen(url) {
+    const modal = document.getElementById('fullScreenModal');
+    const iframe = document.getElementById('chart-iframe');
+    if (modal && iframe) {
+        iframe.src = url;
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden'; // Prevent background scroll
+    }
+}
+
+function closeFullScreen() {
+    const modal = document.getElementById('fullScreenModal');
+    const iframe = document.getElementById('chart-iframe');
+    if (modal && iframe) {
+        modal.style.display = 'none';
+        iframe.src = ''; // Clear src to stop resource usage
+        document.body.style.overflow = ''; // Restore scroll
+    }
+}
+
+function closeFullScreenIfOutside(e) {
+    if (e.target.id === 'fullScreenModal') {
+        closeFullScreen();
+    }
+}
+
+// Helper function for string truncation
+function truncate(str, n) {
+    return (str.length > n) ? str.substr(0, n - 1) + '...' : str;
+}

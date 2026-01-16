@@ -520,10 +520,57 @@ body {
     color: var(--text-secondary);
 }
 
-.cell-agency {
-    max-width: 200px;
-    white-space: nowrap;
+
+
+/* Full Screen Modal for Chart */
+.full-screen-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: none;
+    z-index: 2000;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.iframe-container {
+    width: 95%;
+    height: 90%;
+    background: #fff;
+    position: relative;
+    border-radius: 4px;
     overflow: hidden;
-    text-overflow: ellipsis;
-    color: var(--text-secondary);
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+}
+
+.iframe-full {
+    width: 100%;
+    height: 100%;
+    border: none;
+    display: block;
+}
+
+.close-btn {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 40px;
+    height: 40px;
+    background: #ff4d4f;
+    color: white;
+    font-size: 24px;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+}
+
+.close-btn:hover {
+    background: #ff7875;
 }
