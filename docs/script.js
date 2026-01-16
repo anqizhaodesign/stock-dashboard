@@ -14,7 +14,9 @@ const State = {
     viewMode: 'grid', // 'grid' or 'list'
     viewMode: 'grid', // 'grid' or 'list'
     gridColumns: 'auto', // 'auto', 3, 4, 5, 6
-    klinePeriod: 'W' // 'D' (Daily), 'W' (Weekly), 'M' (Monthly)
+    gridColumns: 'auto', // 'auto', 3, 4, 5, 6
+    klinePeriod: 'W', // 'D' (Daily), 'W' (Weekly), 'M' (Monthly)
+    chartMode: 'h5' // 'web' (Full Site) or 'h5' (Clean Iframe)
 };
 
 // --- IndexedDB Helper ---
@@ -222,6 +224,11 @@ function updateKlinePeriod(period) {
     renderGrid(); // Only affects grid
 }
 
+function updateChartMode(mode) {
+    State.chartMode = mode;
+    renderGrid();
+}
+
 function renderViewToggle() {
     const toggleContainer = document.getElementById('view-toggle-container');
     if (!toggleContainer) return;
@@ -276,6 +283,15 @@ function renderViewToggle() {
                 </select>
             </div>
             ` : ''}
+
+            <!-- Chart Mode Selector -->
+            <div class="control-group" style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text-secondary); margin-left:12px; padding-left:12px; border-left:1px solid #ddd;">
+                <span>Source:</span>
+                <select onchange="updateChartMode(this.value)" style="padding:4px; border-radius:4px; border:1px solid #ddd; font-weight:600; color: #333;">
+                    <option value="web" ${State.chartMode === 'web' ? 'selected' : ''}>Web (Full)</option>
+                    <option value="h5" ${State.chartMode === 'h5' ? 'selected' : ''}>H5 (Lite)</option>
+                </select>
+            </div>
         </div>
     `;
 }
@@ -561,17 +577,29 @@ function renderGrid() {
 
         const { prefix } = getStockInfo(code);
         const imageUrl = getEastmoneyUrl(code);
+
         // Determine Link URL (Full Screen Chart)
-        // BJ stocks need /bj/code.html
-        // KCB (Star Market, 688xxx) needs /kcb/code.html to avoid insecure redirect
-        // Others use /prefixcode.html (e.g. sh600xxx, sz000xxx)
         let linkUrl;
-        if (prefix === 'bj') {
-            linkUrl = `https://quote.eastmoney.com/bj/${code}.html#fullScreenChart`;
-        } else if (code.startsWith('688') || code.startsWith('689')) {
-            linkUrl = `https://quote.eastmoney.com/kcb/${code}.html#fullScreenChart`;
+
+        if (State.chartMode === 'h5') {
+            // H5 Mode Logic
+            // market: 1=SH, 2=SZ/BJ/KCB
+            // type: k=Daily, wk=Weekly, mk=Monthly
+            let marketParam = (prefix === 'sh') ? 1 : 2;
+            let typeParam = 'wk'; // default
+            if (State.klinePeriod === 'D') typeParam = 'k';
+            if (State.klinePeriod === 'M') typeParam = 'mk';
+
+            linkUrl = `https://quote.eastmoney.com/basic/h5chart-iframe.html?code=${code}&market=${marketParam}&type=${typeParam}`;
         } else {
-            linkUrl = `https://quote.eastmoney.com/${prefix}${code}.html#fullScreenChart`;
+            // Web Mode Logic (Existing)
+            if (prefix === 'bj') {
+                linkUrl = `https://quote.eastmoney.com/bj/${code}.html#fullScreenChart`;
+            } else if (code.startsWith('688') || code.startsWith('689')) {
+                linkUrl = `https://quote.eastmoney.com/kcb/${code}.html#fullScreenChart`;
+            } else {
+                linkUrl = `https://quote.eastmoney.com/${prefix}${code}.html#fullScreenChart`;
+            }
         }
 
         const isFav = State.favorites.has(code);
