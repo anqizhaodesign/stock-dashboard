@@ -582,7 +582,7 @@ function renderGrid() {
         const agencyText = agencies.length > 0 ? agencies.join(', ') : '';
 
         card.innerHTML = `
-            <div class="card-header">
+            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 10px;">
                 <div style="display:flex; align-items:center;">
                     <span class="${starClass}" onclick="toggleFavorite('${code}')" title="Toggle Favorite">${starIcon}</span>
                     <div style="display:flex; flex-direction:column; margin-left: 5px;">
@@ -594,10 +594,9 @@ function renderGrid() {
                                 ${truncate(name, 10)}
                              </a>
                              <span class="stock-code">${prefix.toUpperCase()}${code}</span>
-                        </div>
                     </div>
                 </div>
-                <div class="price-val" style="color: ${parseFloat(price) > 0 ? '#d00' : '#333'}">
+                <div class="price-val" style="color: ${parseFloat(price) > 0 ? '#d00' : '#333'}; font-weight:600;">
                     ¥${price}
                 </div>
             </div>
