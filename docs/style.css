@@ -530,7 +530,8 @@ body {
 }
 
 /* Table Cell Content */
-.cell-concept {
+.cell-concept,
+.cell-agency {
     max-width: 380px;
     /* Slightly wider to show more content */
     white-space: nowrap;
@@ -539,9 +540,9 @@ body {
     text-overflow: ellipsis;
     display: block;
     /* Required for ellipsis on span/div inside td */
-    color: var(--text-secondary);
+    color: var(--text-primary);
+    font-weight: 600;
 }
-
 
 
 /* Full Screen Modal for Chart */

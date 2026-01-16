@@ -1189,10 +1189,10 @@ function fetchDetailedStockData(code, prefix) {
                         <span style="font-size: 14px; font-weight: bold; color: ${color}; white-space: nowrap;">
                             ¥${price}
                         </span>
-                        <span style="font-size: 14px; color: #999; white-space: nowrap;">
+                        <span style="font-size: 14px; font-weight: 600; color: #333; white-space: nowrap;">
                             H:${high}
                         </span>
-                        <span style="font-size: 14px; color: #999; white-space: nowrap;">
+                        <span style="font-size: 14px; font-weight: 600; color: #333; white-space: nowrap;">
                             L:${low}
                         </span>
                     `;
