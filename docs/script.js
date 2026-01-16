@@ -563,10 +563,16 @@ function renderGrid() {
         const imageUrl = getEastmoneyUrl(code);
         // Determine Link URL (Full Screen Chart)
         // BJ stocks need /bj/code.html
+        // KCB (Star Market, 688xxx) needs /kcb/code.html to avoid insecure redirect
         // Others use /prefixcode.html (e.g. sh600xxx, sz000xxx)
-        const linkUrl = prefix === 'bj'
-            ? `https://quote.eastmoney.com/bj/${code}.html#fullScreenChart`
-            : `https://quote.eastmoney.com/${prefix}${code}.html#fullScreenChart`;
+        let linkUrl;
+        if (prefix === 'bj') {
+            linkUrl = `https://quote.eastmoney.com/bj/${code}.html#fullScreenChart`;
+        } else if (code.startsWith('688')) {
+            linkUrl = `https://quote.eastmoney.com/kcb/${code}.html#fullScreenChart`;
+        } else {
+            linkUrl = `https://quote.eastmoney.com/${prefix}${code}.html#fullScreenChart`;
+        }
 
         const isFav = State.favorites.has(code);
         const starClass = isFav ? 'star-btn active' : 'star-btn';
