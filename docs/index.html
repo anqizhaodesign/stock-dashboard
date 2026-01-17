@@ -139,6 +139,9 @@
     <!-- Full Screen Chart Modal -->
     <div id="fullScreenModal" class="full-screen-modal" onclick="closeFullScreenIfOutside(event)">
         <div class="iframe-container">
+            <a id="external-link" href="#" target="_blank" rel="noopener" 
+               style="position: absolute; top: 0; right: 50px; width: 40px; height: 40px; background: #1890ff; color: white; font-size: 18px; display: flex; align-items: center; justify-content: center; text-decoration: none; z-index: 10;"
+               title="Open in Eastmoney">↗</a>
             <button class="close-btn" onclick="closeFullScreen()">×</button>
             <iframe id="chart-iframe" class="iframe-full" src=""></iframe>
         </div>

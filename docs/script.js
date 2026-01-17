@@ -1101,10 +1101,40 @@ document.addEventListener('DOMContentLoaded', init);
 function openFullScreen(url) {
     const modal = document.getElementById('fullScreenModal');
     const iframe = document.getElementById('chart-iframe');
+    const externalLink = document.getElementById('external-link');
     if (modal && iframe) {
         iframe.src = url;
         modal.style.display = 'flex';
         document.body.style.overflow = 'hidden'; // Prevent background scroll
+
+        // Set external link - extract stock info from URL and build quote.eastmoney link
+        if (externalLink) {
+            // URL might be like: https://quote.eastmoney.com/basic/h5chart-iframe.html?code=688418&market=1&type=wk
+            // Or: https://quote.eastmoney.com/sh600519.html#fullScreenChart
+            // We need to build: https://quote.eastmoney.com/sh600519.html or https://quote.eastmoney.com/kcb/688418.html
+
+            let quoteUrl = url;
+            // If it's h5chart-iframe, extract code and market to build proper URL
+            if (url.includes('h5chart-iframe')) {
+                const urlParams = new URL(url).searchParams;
+                const code = urlParams.get('code');
+                const market = urlParams.get('market');
+                if (code && market) {
+                    const prefix = market === '1' ? 'sh' : 'sz';
+                    if (code.startsWith('688') || code.startsWith('689')) {
+                        quoteUrl = `https://quote.eastmoney.com/kcb/${code}.html`;
+                    } else if (code.startsWith('8') || code.startsWith('4')) {
+                        quoteUrl = `https://quote.eastmoney.com/bj/${code}.html`;
+                    } else {
+                        quoteUrl = `https://quote.eastmoney.com/${prefix}${code}.html`;
+                    }
+                }
+            } else if (url.includes('#fullScreenChart')) {
+                // Remove the hash part
+                quoteUrl = url.split('#')[0];
+            }
+            externalLink.href = quoteUrl;
+        }
     }
 }
 
