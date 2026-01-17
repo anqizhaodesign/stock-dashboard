@@ -862,12 +862,22 @@ function toggleFavorite(code) {
     } else {
         DB.delete('favorites', code).catch(console.error);
     }
-    // localStorage.setItem('stock_favorites', JSON.stringify(Array.from(State.favorites)));
 
-    // Helper to refresh UI specifically for stars without full re-render? 
-    // For now full re-render is safer and fast enough.
-    renderGrid();
-    renderSidebar(); // Update count
+    // Update star icon in-place without full re-render
+    const isFav = State.favorites.has(code);
+    // Find all star buttons for this code (could be in grid or list view)
+    document.querySelectorAll(`[onclick="toggleFavorite('${code}')"]`).forEach(el => {
+        el.textContent = isFav ? '★' : '☆';
+        if (isFav) {
+            el.classList.add('active');
+        } else {
+            el.classList.remove('active');
+        }
+    });
+
+    // Update sidebar count only
+    const badge = document.getElementById('fav-count-badge');
+    if (badge) badge.textContent = State.favorites.size;
 }
 
 function addStockFromInput() {
